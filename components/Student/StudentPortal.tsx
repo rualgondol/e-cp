@@ -14,7 +14,7 @@ interface StudentPortalProps {
   students: Student[];
   classes: ClassLevel[];
   progress: Progress[];
-  setProgress: React.Dispatch<React.SetStateAction<Progress[]>>;
+  setProgress: (newProgress: React.SetStateAction<Progress[]>) => void;
   messages: Message[];
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
 }
