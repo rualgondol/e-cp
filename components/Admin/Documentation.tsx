@@ -170,7 +170,7 @@ ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, icon = EXCLUDED.icon;
                 <div className="text-4xl">🚀</div>
                 <h4 className="text-xl font-black uppercase tracking-tight">Vérifiez vos variables d'environnement</h4>
                 <p className="text-sm opacity-90 leading-relaxed font-medium">
-                    Dans votre projet Vercel, allez dans <b>Settings > Environment Variables</b>. <br/>
+                    Dans votre projet Vercel, allez dans <b>Settings &gt; Environment Variables</b>. <br/>
                     L'intégration Supabase crée normalement ces variables :
                 </p>
                 <ul className="bg-white/10 p-4 rounded-2xl border border-white/20 text-xs font-mono space-y-1">
