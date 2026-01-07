@@ -37,7 +37,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   });
   const [activeTab, setActiveTab] = useState<'sessions' | 'students' | 'tracking' | 'classes' | 'messages' | 'docs' | 'users'>('sessions');
 
-  // Si l'utilisateur a un rôle restreint, on le force sur son club
   useEffect(() => {
     if (currentUserRole === 'AVENTURIERS') setActiveClub(ClubType.AVENTURIERS);
     if (currentUserRole === 'EXPLORATEURS') setActiveClub(ClubType.EXPLORATEURS);
@@ -127,7 +126,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           {activeTab === 'tracking' && <GlobalTracking club={activeClub} sessions={sessions} students={students} progress={progress} setProgress={setProgress} classes={classes} />}
           {activeTab === 'classes' && isAdmin && <ClassManager club={activeClub} classes={classes} setClasses={setClasses} />}
           {activeTab === 'messages' && <AdminMessaging club={activeClub} students={students} messages={messages} setMessages={setMessages} />}
-          {activeTab === 'docs' && isAdmin && <Documentation club={activeClub} students={students} classes={classes} dbStatus={dbStatus} />}
+          {activeTab === 'docs' && isAdmin && (
+            <Documentation 
+              club={activeClub} 
+              students={students} 
+              classes={classes} 
+              sessions={sessions}
+              progress={progress}
+              instructors={instructors}
+              dbStatus={dbStatus} 
+            />
+          )}
           {activeTab === 'users' && isAdmin && <InstructorManager instructors={instructors} setInstructors={setInstructors} />}
         </div>
       </main>

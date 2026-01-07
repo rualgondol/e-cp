@@ -1,16 +1,19 @@
 
 import React, { useState } from 'react';
-import { ClubType, Student, ClassLevel } from '../../types';
-import { saveSupabaseConfig } from '../../services/supabaseService';
+import { ClubType, Student, ClassLevel, Session, Progress, Instructor } from '../../types';
+import { saveSupabaseConfig, db } from '../../services/supabaseService';
 
 interface DocumentationProps {
   club: ClubType;
   students: Student[];
   classes: ClassLevel[];
+  sessions: Session[];
+  progress: Progress[];
+  instructors: Instructor[];
   dbStatus: 'loading' | 'connected' | 'error';
 }
 
-const Documentation: React.FC<DocumentationProps> = ({ club, students, classes, dbStatus }) => {
+const Documentation: React.FC<DocumentationProps> = ({ club, students, classes, sessions, progress, instructors, dbStatus }) => {
   const [activeDocTab, setActiveDocTab] = useState<'system' | 'config' | 'deploy' | 'cheat'>('system');
   
   // États pour Supabase
@@ -21,25 +24,45 @@ const Documentation: React.FC<DocumentationProps> = ({ club, students, classes, 
   const [geminiKey, setGeminiKey] = useState(localStorage.getItem('MJA_GEMINI_API_KEY') || '');
   
   const [saveMsg, setSaveMsg] = useState('');
+  const [syncLoading, setSyncLoading] = useState(false);
 
   const handleSaveConfig = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Sauvegarde Supabase
-    if (url && key) {
-      saveSupabaseConfig(url, key);
-    }
-    
-    // Sauvegarde Gemini
-    if (geminiKey) {
-      localStorage.setItem('MJA_GEMINI_API_KEY', geminiKey);
-    }
+    if (url && key) saveSupabaseConfig(url, key);
+    if (geminiKey) localStorage.setItem('MJA_GEMINI_API_KEY', geminiKey);
 
     setSaveMsg('✅ Configuration mise à jour avec succès !');
     setTimeout(() => {
       setSaveMsg('');
-      if (url && key) window.location.reload(); // Recharger seulement si la DB change
+      if (url && key) window.location.reload();
     }, 1500);
+  };
+
+  const handleFullSync = async () => {
+    if (dbStatus !== 'connected') {
+      alert("Veuillez d'abord connecter et enregistrer votre base de données Supabase.");
+      return;
+    }
+
+    if (!confirm("Voulez-vous envoyer toutes les données actuelles (élèves, séances, classes) vers Supabase ? Cela mettra à jour votre base de données cloud.")) return;
+
+    setSyncLoading(true);
+    try {
+      // Synchronisation séquentielle pour éviter les erreurs de clés étrangères
+      await db.syncClasses(classes);
+      await db.syncInstructors(instructors);
+      await db.syncStudents(students);
+      await db.syncSessions(sessions);
+      await db.syncProgress(progress);
+      
+      setSaveMsg('🚀 Synchronisation Cloud réussie !');
+    } catch (err) {
+      console.error(err);
+      alert("Erreur lors de la synchronisation : " + (err instanceof Error ? err.message : "Inconnue"));
+    } finally {
+      setSyncLoading(false);
+      setTimeout(() => setSaveMsg(''), 3000);
+    }
   };
 
   const fullSqlScript = `-- 1. Table des Classes
@@ -149,9 +172,6 @@ INSERT INTO classes (id, name, age, club, icon) VALUES
         {activeDocTab === 'config' && (
           <div className="max-w-xl space-y-8 animate-fade-in">
             <h3 className="text-2xl font-black text-gray-800 tracking-tighter uppercase border-l-4 border-blue-600 pl-4">Services Cloud & IA</h3>
-            <p className="text-sm text-gray-500 font-medium leading-relaxed">
-                Configurez vos services externes ici. Ces paramètres sont stockés dans votre navigateur.
-            </p>
             
             <form onSubmit={handleSaveConfig} className="space-y-8">
               {/* Section Supabase */}
@@ -203,9 +223,6 @@ INSERT INTO classes (id, name, age, club, icon) VALUES
                       placeholder="AIzaSy..."
                       className="w-full border-2 border-indigo-100 p-4 rounded-2xl font-mono text-xs focus:border-indigo-500 outline-none shadow-sm"
                     />
-                    <p className="mt-3 text-[9px] text-indigo-400 font-bold uppercase ml-2">
-                        Obtenez une clé gratuite sur : <a href="https://aistudio.google.com/app/apikey" target="_blank" className="underline">aistudio.google.com</a>
-                    </p>
                  </div>
               </div>
 
@@ -215,9 +232,26 @@ INSERT INTO classes (id, name, age, club, icon) VALUES
                  </p>
                )}
                
-               <button type="submit" className="w-full bg-[#004225] text-white py-6 rounded-2xl font-black text-[11px] uppercase tracking-[0.2em] shadow-xl hover:scale-[1.01] active:scale-95 transition-all">
-                  ⚡ Enregistrer toute la configuration
-               </button>
+               <div className="flex flex-col gap-4">
+                  <button type="submit" className="w-full bg-[#004225] text-white py-6 rounded-2xl font-black text-[11px] uppercase tracking-[0.2em] shadow-xl hover:scale-[1.01] active:scale-95 transition-all">
+                      ⚡ Enregistrer la configuration
+                  </button>
+
+                  <div className="bg-amber-50 p-6 rounded-3xl border border-amber-100 space-y-4">
+                     <p className="text-[9px] font-black text-amber-600 uppercase tracking-widest">Outil de Migration</p>
+                     <p className="text-xs text-amber-800 leading-relaxed font-medium">
+                        Si votre base de données est vide, cliquez sur le bouton ci-dessous pour envoyer vos données actuelles vers Supabase.
+                     </p>
+                     <button 
+                        type="button"
+                        onClick={handleFullSync}
+                        disabled={syncLoading || dbStatus !== 'connected'}
+                        className="w-full bg-amber-500 text-white py-4 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-amber-600 disabled:opacity-50"
+                     >
+                        {syncLoading ? '🚀 Synchronisation en cours...' : '⬆️ Pousser les données vers le Cloud'}
+                     </button>
+                  </div>
+               </div>
             </form>
           </div>
         )}
