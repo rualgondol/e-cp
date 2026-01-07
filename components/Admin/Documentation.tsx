@@ -7,9 +7,10 @@ interface DocumentationProps {
   club: ClubType;
   students: Student[];
   classes: ClassLevel[];
+  dbStatus: 'loading' | 'connected' | 'error';
 }
 
-const Documentation: React.FC<DocumentationProps> = ({ club, students, classes }) => {
+const Documentation: React.FC<DocumentationProps> = ({ club, students, classes, dbStatus }) => {
   const [activeDocTab, setActiveDocTab] = useState<'system' | 'config' | 'deploy' | 'cheat'>('system');
   
   // États pour Supabase
@@ -154,7 +155,13 @@ INSERT INTO classes (id, name, age, club, icon) VALUES
             
             <form onSubmit={handleSaveConfig} className="space-y-8">
               {/* Section Supabase */}
-              <div className="bg-gray-50 p-8 rounded-[2.5rem] border border-gray-200 space-y-6 shadow-inner">
+              <div className="bg-gray-50 p-8 rounded-[2.5rem] border border-gray-200 space-y-6 shadow-inner relative">
+                 <div className="absolute top-8 right-8 flex items-center gap-2">
+                    <span className={`text-[8px] font-black uppercase tracking-widest ${dbStatus === 'connected' ? 'text-green-600' : 'text-red-500'}`}>
+                        {dbStatus === 'connected' ? 'Connecté' : 'Erreur'}
+                    </span>
+                    <div className={`w-2.5 h-2.5 rounded-full ${dbStatus === 'connected' ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+                 </div>
                  <div className="flex items-center gap-2 mb-2">
                     <span className="text-xl">🗄️</span>
                     <h4 className="text-xs font-black text-gray-900 uppercase tracking-widest">Base de données Supabase</h4>
@@ -178,7 +185,13 @@ INSERT INTO classes (id, name, age, club, icon) VALUES
               </div>
 
               {/* Section Gemini */}
-              <div className="bg-indigo-50/50 p-8 rounded-[2.5rem] border border-indigo-100 space-y-6 shadow-inner">
+              <div className="bg-indigo-50/50 p-8 rounded-[2.5rem] border border-indigo-100 space-y-6 shadow-inner relative">
+                 <div className="absolute top-8 right-8 flex items-center gap-2">
+                    <span className={`text-[8px] font-black uppercase tracking-widest ${geminiKey ? 'text-indigo-600' : 'text-gray-400'}`}>
+                        {geminiKey ? 'Clé Active' : 'Manquante'}
+                    </span>
+                    <div className={`w-2.5 h-2.5 rounded-full ${geminiKey ? 'bg-indigo-500 animate-pulse' : 'bg-gray-300'}`} />
+                 </div>
                  <div className="flex items-center gap-2 mb-2">
                     <span className="text-xl">✨</span>
                     <h4 className="text-xs font-black text-indigo-900 uppercase tracking-widest">Intelligence Artificielle (Gemini)</h4>
@@ -240,8 +253,8 @@ INSERT INTO classes (id, name, age, club, icon) VALUES
                     📋 COPIER LE SCRIPT
                 </button>
             </div>
-            <p className="text-sm text-gray-500 font-medium">
-                Allez dans votre tableau de bord Supabase > **SQL Editor** > **New Query**, collez ce script et cliquez sur **Run**.
+            <p className="text-sm text-gray-500 font-medium leading-relaxed">
+                {"Allez dans votre tableau de bord Supabase > SQL Editor > New Query, collez ce script et cliquez sur Run."}
             </p>
             <div className="bg-gray-900 text-green-400 p-8 rounded-3xl font-mono text-[11px] overflow-x-auto shadow-2xl border-4 border-gray-800">
               <pre className="leading-relaxed">{fullSqlScript}</pre>
