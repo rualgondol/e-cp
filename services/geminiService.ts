@@ -1,15 +1,23 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 
-// Initialize the GoogleGenAI client using the API key from the environment.
-// Guideline: Always use process.env.API_KEY exclusively and initialize with a named parameter.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Fonction helper pour récupérer la clé API de manière sécurisée
+const getApiKey = () => {
+  try {
+    return process.env.API_KEY || "";
+  } catch {
+    return "";
+  }
+};
 
 /**
  * Generates course content based on subject and description using Gemini 3 Flash.
  */
 export async function generateSessionContent(title: string, subjectName: string, description: string) {
-  // Guideline: Always use ai.models.generateContent to query GenAI.
+  const apiKey = getApiKey();
+  if (!apiKey) return "Erreur : Clé API Gemini non configurée dans Vercel.";
+
+  const ai = new GoogleGenAI({ apiKey });
   const prompt = `Génère un cours court pour un enfant JA (Aventurier/Explorateur). Thème: ${subjectName}. Objectif: ${description}. Format: HTML simple (h2, p, ul, li).`;
 
   try {
@@ -17,7 +25,6 @@ export async function generateSessionContent(title: string, subjectName: string,
       model: 'gemini-3-flash-preview',
       contents: prompt,
     });
-    // Guideline: Access the .text property directly (not a method).
     return response.text || "Aucun contenu généré.";
   } catch (error) {
     console.error("Gemini Error:", error);
@@ -29,7 +36,10 @@ export async function generateSessionContent(title: string, subjectName: string,
  * Generates a quiz for a given subject content with JSON schema validation.
  */
 export async function generateQuizForSubject(subjectName: string, content: string) {
-  // Guideline: Provide responseSchema and responseMimeType for structured JSON output.
+  const apiKey = getApiKey();
+  if (!apiKey) return [];
+
+  const ai = new GoogleGenAI({ apiKey });
   const prompt = `Génère un quiz de 4 questions sur ce contenu JA : ${content}. 4 options, 1 index correct.`;
 
   try {
@@ -53,7 +63,6 @@ export async function generateQuizForSubject(subjectName: string, content: strin
       }
     });
     
-    // Guideline: Access the .text property and trim the string before parsing.
     const jsonStr = response.text?.trim() || "[]";
     return JSON.parse(jsonStr);
   } catch (error) {
