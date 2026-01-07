@@ -18,8 +18,8 @@ const Login: React.FC<LoginProps> = ({ onLogin, students, dbStatus, isLoading })
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isConnected) return;
-
+    // On permet la connexion même si non connecté au cloud (mode démo/local)
+    
     if (username === 'admin' && password === 'admin') {
       onLogin('admin', 'admin');
     } else {
@@ -40,7 +40,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, students, dbStatus, isLoading })
         <div className="absolute top-8 right-8 flex flex-col items-end gap-1 z-10">
             <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-full border border-gray-100 shadow-sm">
                 <span className={`text-[7px] font-black uppercase tracking-widest ${isConnected ? 'text-blue-600' : dbStatus === 'loading' ? 'text-gray-400' : 'text-red-500'}`}>
-                    {isConnected ? 'Cloud Connecté' : dbStatus === 'loading' ? 'Connexion...' : 'Hors ligne'}
+                    {isConnected ? 'Cloud Connecté' : dbStatus === 'loading' ? 'Connexion...' : 'Mode Local (Offline)'}
                 </span>
                 <div 
                     className={`w-2.5 h-2.5 rounded-full shadow-lg transition-all duration-700 ${
@@ -79,11 +79,10 @@ const Login: React.FC<LoginProps> = ({ onLogin, students, dbStatus, isLoading })
         </div>
 
         <form onSubmit={handleLogin} className="space-y-6">
-          <div className={`transition-all duration-500 ${!isConnected ? 'opacity-30 pointer-events-none grayscale' : 'opacity-100'}`}>
+          <div className="transition-all duration-500">
             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2 ml-2">Identifiant (Nom complet)</label>
             <input 
               type="text" 
-              disabled={!isConnected}
               value={username} 
               onChange={(e) => setUsername(e.target.value)} 
               className="w-full rounded-2xl border-2 border-gray-100 bg-gray-50 p-4 font-bold outline-none focus:border-green-500 focus:bg-white transition-all shadow-inner placeholder:text-gray-300 text-sm" 
@@ -91,11 +90,10 @@ const Login: React.FC<LoginProps> = ({ onLogin, students, dbStatus, isLoading })
             />
           </div>
           
-          <div className={`transition-all duration-500 ${!isConnected ? 'opacity-30 pointer-events-none grayscale' : 'opacity-100'}`}>
+          <div className="transition-all duration-500">
             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2 ml-2">Mot de passe</label>
             <input 
               type="password" 
-              disabled={!isConnected}
               value={password} 
               onChange={(e) => setPassword(e.target.value)} 
               className="w-full rounded-2xl border-2 border-gray-100 bg-gray-50 p-4 font-bold outline-none focus:border-green-500 focus:bg-white transition-all shadow-inner placeholder:text-gray-300 text-sm" 
@@ -108,10 +106,8 @@ const Login: React.FC<LoginProps> = ({ onLogin, students, dbStatus, isLoading })
           <div className="relative pt-2">
             <button 
               type="submit" 
-              disabled={!isConnected || isLoading}
-              className={`w-full py-5 rounded-2xl text-[11px] font-black text-white uppercase tracking-[0.2em] shadow-2xl transition-all relative overflow-hidden group ${
-                  isConnected ? 'bg-[#004225] hover:bg-[#005530] hover:scale-[1.02] active:scale-95' : 'bg-gray-100 text-gray-300 cursor-not-allowed shadow-none border border-gray-200'
-              }`}
+              disabled={isLoading}
+              className={`w-full py-5 rounded-2xl text-[11px] font-black text-white uppercase tracking-[0.2em] shadow-2xl transition-all relative overflow-hidden group bg-[#004225] hover:bg-[#005530] hover:scale-[1.02] active:scale-95`}
             >
               <div className="relative z-10 flex items-center justify-center gap-3">
                 {isLoading ? (
@@ -119,10 +115,8 @@ const Login: React.FC<LoginProps> = ({ onLogin, students, dbStatus, isLoading })
                         <div className="w-3.5 h-3.5 border-2 border-gray-400 border-t-white rounded-full animate-spin"/> 
                         <span>Vérification...</span>
                     </>
-                ) : isConnected ? (
-                    <>🚀 Accéder au Portail</>
                 ) : (
-                    <>⚠️ Serveur distant hors-ligne</>
+                    <>🚀 Accéder au Portail</>
                 )}
               </div>
             </button>
@@ -131,7 +125,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, students, dbStatus, isLoading })
 
         <div className="mt-12 text-center">
             <p className="text-[8px] text-gray-300 font-black uppercase tracking-[0.2em] leading-relaxed">
-               Sécurité Cloud e-CP MJA • Kuvasz Fidèle
+               PLATEFORME e-CP MJA • Kuvasz Fidèle
             </p>
         </div>
       </div>
