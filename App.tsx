@@ -4,7 +4,7 @@ import { Student, Session, Progress, Message, ClassLevel, Instructor } from './t
 import AdminDashboard from './components/Admin/AdminDashboard';
 import StudentPortal from './components/Student/StudentPortal';
 import Login from './components/Login';
-import { db, checkConnection, isSupabaseConfigured } from './services/supabaseService';
+import { db, checkConnection } from './services/supabaseService';
 import { initialSessions, initialStudents, initialProgress, initialMessages } from './mockData';
 import { CLASSES } from './constants';
 
@@ -79,15 +79,29 @@ const App: React.FC = () => {
     }
   }, []);
 
+  // Synchronisation automatique des instructeurs
   useEffect(() => {
     localStorage.setItem('mja_instructors', JSON.stringify(instructors));
     if (dbStatus === 'connected') db.syncInstructors(instructors);
   }, [instructors, dbStatus]);
 
+  // Helper pour mettre à jour et synchroniser les sessions
   const updateSessions = (newSessions: React.SetStateAction<Session[]>) => {
     setSessions(prev => {
       const next = typeof newSessions === 'function' ? newSessions(prev) : newSessions;
       if (dbStatus === 'connected') db.syncSessions(next).catch(e => console.error(e));
+      return next;
+    });
+  };
+
+  // Helper pour mettre à jour et synchroniser la progression (Automatique pour les élèves)
+  const updateProgress = (newProgress: React.SetStateAction<Progress[]>) => {
+    setProgress(prev => {
+      const next = typeof newProgress === 'function' ? newProgress(prev) : newProgress;
+      if (dbStatus === 'connected') {
+        // On synchronise vers le cloud de manière asynchrone sans bloquer l'UI
+        db.syncProgress(next).catch(e => console.error("Sync Progress Error:", e));
+      }
       return next;
     });
   };
@@ -135,7 +149,7 @@ const App: React.FC = () => {
           classes={classes}
           setClasses={setClasses}
           progress={progress}
-          setProgress={setProgress}
+          setProgress={updateProgress}
           messages={messages}
           setMessages={setMessages}
           instructors={instructors}
@@ -150,7 +164,7 @@ const App: React.FC = () => {
           students={students}
           classes={classes}
           progress={progress}
-          setProgress={setProgress}
+          setProgress={updateProgress}
           messages={messages}
           setMessages={setMessages}
         />
