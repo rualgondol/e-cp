@@ -4,6 +4,16 @@ export enum ClubType {
   EXPLORATEURS = 'EXPLORATEURS'
 }
 
+export type InstructorRole = 'ADMIN' | 'AVENTURIERS' | 'EXPLORATEURS';
+
+export type Instructor = {
+  id: string;
+  fullName: string;
+  username: string;
+  password: string;
+  role: InstructorRole;
+};
+
 export type QuizQuestion = {
   text: string;
   options: string[];
@@ -13,7 +23,7 @@ export type QuizQuestion = {
 export type Subject = {
   id: string;
   name: string;
-  prerequisite: string; // Précédemment 'description'
+  prerequisite: string;
   content: string;
   quiz?: QuizQuestion[];
 };
@@ -23,7 +33,7 @@ export type ClassLevel = {
   name: string;
   age: number;
   club: ClubType;
-  icon?: string; // Emoji ou Base64 Image
+  icon?: string;
 };
 
 export type Session = {
