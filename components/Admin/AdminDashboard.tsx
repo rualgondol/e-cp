@@ -93,8 +93,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <span>💬 Messagerie</span>
               {unreadCount > 0 && <span className="bg-red-500 text-[10px] px-2 py-0.5 rounded-full">{unreadCount}</span>}
             </button>
-            {isAdmin && <button onClick={() => setActiveTab('users')} className={`w-full text-left p-3 rounded-xl transition-all ${activeTab === 'users' ? 'bg-white/10 font-bold' : 'opacity-70'}`}>👤 Utilisateurs</button>}
-            <button onClick={() => setActiveTab('docs')} className={`w-full text-left p-3 rounded-xl transition-all ${activeTab === 'docs' ? 'bg-white/10 font-bold' : 'opacity-70'}`}>📚 Documentation</button>
+            {isAdmin && (
+              <>
+                <button onClick={() => setActiveTab('users')} className={`w-full text-left p-3 rounded-xl transition-all ${activeTab === 'users' ? 'bg-white/10 font-bold' : 'opacity-70'}`}>👤 Utilisateurs</button>
+                <button onClick={() => setActiveTab('docs')} className={`w-full text-left p-3 rounded-xl transition-all ${activeTab === 'docs' ? 'bg-white/10 font-bold' : 'opacity-70'}`}>📚 Documentation</button>
+              </>
+            )}
           </div>
         </nav>
 
@@ -123,7 +127,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           {activeTab === 'tracking' && <GlobalTracking club={activeClub} sessions={sessions} students={students} progress={progress} setProgress={setProgress} classes={classes} />}
           {activeTab === 'classes' && isAdmin && <ClassManager club={activeClub} classes={classes} setClasses={setClasses} />}
           {activeTab === 'messages' && <AdminMessaging club={activeClub} students={students} messages={messages} setMessages={setMessages} />}
-          {activeTab === 'docs' && <Documentation club={activeClub} students={students} classes={classes} dbStatus={dbStatus} />}
+          {activeTab === 'docs' && isAdmin && <Documentation club={activeClub} students={students} classes={classes} dbStatus={dbStatus} />}
           {activeTab === 'users' && isAdmin && <InstructorManager instructors={instructors} setInstructors={setInstructors} />}
         </div>
       </main>
