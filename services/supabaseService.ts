@@ -2,10 +2,13 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Session, Student, ClassLevel, Progress, Message } from '../types';
 
-// Accès sécurisé aux variables d'environnement injectées par Vercel
-// On utilise une approche multi-sources pour garantir la récupération des clés
+/**
+ * Récupération des variables d'environnement.
+ * Sur Vercel, les variables préfixées par NEXT_PUBLIC_ sont injectées dans le bundle client.
+ */
 const getEnvVar = (key: string): string => {
   if (typeof process !== 'undefined' && process.env) {
+    // On cherche d'abord avec le préfixe public Vercel, puis le nom standard
     return process.env[`NEXT_PUBLIC_${key}`] || process.env[key] || "";
   }
   return "";
@@ -20,8 +23,8 @@ export const initSupabase = (): SupabaseClient => {
   if (supabaseInstance) return supabaseInstance;
 
   if (!SUPABASE_URL || !SUPABASE_KEY) {
-    console.error("CRITICAL: Supabase keys not found in environment.");
-    throw new Error("Missing Supabase URL or Key");
+    console.error("ERREUR CRITIQUE : Les clés Supabase ne sont pas détectées dans l'environnement.");
+    throw new Error("Configuration Supabase manquante.");
   }
 
   supabaseInstance = createClient(SUPABASE_URL, SUPABASE_KEY, {
@@ -34,22 +37,25 @@ export const initSupabase = (): SupabaseClient => {
 };
 
 export const isSupabaseConfigured = () => {
-  return SUPABASE_URL && SUPABASE_KEY && SUPABASE_URL.startsWith('http');
+  return !!(SUPABASE_URL && SUPABASE_KEY && SUPABASE_URL.startsWith('http'));
 };
 
 export const checkConnection = async (): Promise<boolean> => {
-  if (!isSupabaseConfigured()) return false;
+  if (!isSupabaseConfigured()) {
+    console.warn("Vérification de connexion : Configuration manquante.");
+    return false;
+  }
   try {
     const client = initSupabase();
-    // Test minimal sur la table classes
+    // Test minimal sur la table classes pour valider que le schéma SQL est en place
     const { data, error } = await client.from('classes').select('id').limit(1);
     if (error) {
-      console.error("Supabase connection check error:", error.message);
+      console.error("Échec de connexion Supabase (Table manquante ou clé invalide) :", error.message);
       return false;
     }
     return true;
   } catch (err) {
-    console.error("Supabase connection fatal error:", err);
+    console.error("Erreur fatale lors de la connexion Supabase :", err);
     return false;
   }
 };
@@ -70,7 +76,6 @@ export const db = {
     return data || [];
   },
   async syncStudents(students: Student[]) {
-    // Note: upsert nécessite que les colonnes correspondent exactement au schéma SQL
     const { error } = await initSupabase().from('students').upsert(students);
     if (error) throw error;
   },
