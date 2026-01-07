@@ -21,13 +21,12 @@ const App: React.FC = () => {
     const connectAndLoad = async () => {
       setLoading(true);
       
-      // On attend un peu que les variables d'env soient prêtes si besoin
       const isOk = await checkConnection();
       
       if (!isOk) {
-        console.warn("Connexion Supabase échouée. Vérifiez vos variables d'environnement.");
         setDbStatus('error');
         setLoading(false);
+        // On essaye quand même de charger les données locales si elles existent
         return;
       }
 
@@ -47,7 +46,7 @@ const App: React.FC = () => {
         setMessages(m);
         setDbStatus('connected');
       } catch (err) {
-        console.error("Erreur lors du chargement des données:", err);
+        console.error("Erreur de chargement:", err);
         setDbStatus('error');
       } finally {
         setLoading(false);
@@ -68,7 +67,7 @@ const App: React.FC = () => {
   const updateSessions = (newSessions: React.SetStateAction<Session[]>) => {
     setSessions(prev => {
       const next = typeof newSessions === 'function' ? newSessions(prev) : newSessions;
-      if (dbStatus === 'connected') db.syncSessions(next).catch(e => console.error("Sync error:", e));
+      if (dbStatus === 'connected') db.syncSessions(next).catch(e => console.error(e));
       return next;
     });
   };
@@ -76,7 +75,7 @@ const App: React.FC = () => {
   const updateStudents = (newStudents: React.SetStateAction<Student[]>) => {
     setStudents(prev => {
       const next = typeof newStudents === 'function' ? newStudents(prev) : newStudents;
-      if (dbStatus === 'connected') db.syncStudents(next).catch(e => console.error("Sync error:", e));
+      if (dbStatus === 'connected') db.syncStudents(next).catch(e => console.error(e));
       return next;
     });
   };
@@ -84,7 +83,7 @@ const App: React.FC = () => {
   const updateClasses = (newClasses: React.SetStateAction<ClassLevel[]>) => {
     setClasses(prev => {
       const next = typeof newClasses === 'function' ? newClasses(prev) : newClasses;
-      if (dbStatus === 'connected') db.syncClasses(next).catch(e => console.error("Sync error:", e));
+      if (dbStatus === 'connected') db.syncClasses(next).catch(e => console.error(e));
       return next;
     });
   };
@@ -92,7 +91,7 @@ const App: React.FC = () => {
   const updateProgress = (newProgress: React.SetStateAction<Progress[]>) => {
     setProgress(prev => {
       const next = typeof newProgress === 'function' ? newProgress(prev) : newProgress;
-      if (dbStatus === 'connected') db.syncProgress(next).catch(e => console.error("Sync error:", e));
+      if (dbStatus === 'connected') db.syncProgress(next).catch(e => console.error(e));
       return next;
     });
   };
@@ -107,6 +106,18 @@ const App: React.FC = () => {
     setUser(null);
     localStorage.removeItem('mja_user');
   };
+
+  // État de chargement initial pour éviter l'écran blanc
+  if (loading && dbStatus === 'loading') {
+    return (
+      <div className="min-h-screen bg-[#004225] flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-white border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-white font-bold uppercase tracking-widest text-xs">e-CP MJA : Connexion au Cloud...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen relative">
