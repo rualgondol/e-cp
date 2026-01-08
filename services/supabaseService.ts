@@ -2,50 +2,53 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Session, Student, ClassLevel, Progress, Message, Instructor } from '../types';
 
-// Récupération des clés : Vercel (Production) > LocalStorage (Développement/Override)
-const getSupabaseConfig = () => {
-  // Sur Vercel, ces variables doivent être définies dans le Dashboard Settings > Environment Variables
-  const envUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
-  const envKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
-  
-  const localUrl = localStorage.getItem('MJA_SUPABASE_URL');
-  const localKey = localStorage.getItem('MJA_SUPABASE_ANON_KEY');
-  
-  return {
-    url: envUrl || localUrl || "",
-    key: envKey || localKey || ""
-  };
+// Fonction de récupération exhaustive des clés (Vercel / Process / Local)
+const getEnvVar = (name: string): string => {
+  // 1. Essai via process.env (Vercel / Node)
+  if (typeof process !== 'undefined' && process.env && process.env[name]) {
+    return process.env[name] as string;
+  }
+  // 2. Essai via import.meta.env (Vite)
+  // @ts-ignore
+  if (typeof import !== 'undefined' && import.meta && import.meta.env && import.meta.env[name]) {
+    // @ts-ignore
+    return import.meta.env[name] as string;
+  }
+  // 3. Essai via localStorage (Configuration manuelle)
+  const localName = name.replace('NEXT_PUBLIC_', 'MJA_');
+  return localStorage.getItem(localName) || "";
 };
+
+const SUPABASE_URL = getEnvVar('NEXT_PUBLIC_SUPABASE_URL');
+const SUPABASE_KEY = getEnvVar('NEXT_PUBLIC_SUPABASE_ANON_KEY');
 
 let supabaseInstance: SupabaseClient | null = null;
 
 export const isSupabaseConfigured = (): boolean => {
-  const { url, key } = getSupabaseConfig();
-  return !!(url && key && url.startsWith('http'));
+  return !!(SUPABASE_URL && SUPABASE_KEY && SUPABASE_URL.startsWith('http'));
 };
 
 export const initSupabase = (forceReinit: boolean = false): SupabaseClient | null => {
   if (supabaseInstance && !forceReinit) return supabaseInstance;
   
-  const { url, key } = getSupabaseConfig();
-  if (!url || !key) return null;
-
-  try {
-    supabaseInstance = createClient(url, key, {
-      auth: { 
-        persistSession: false, 
-        autoRefreshToken: true,
-        detectSessionInUrl: false
-      },
-      global: {
-        headers: { 'x-application-name': 'e-cp-mja' }
-      }
-    });
-    return supabaseInstance;
-  } catch (e) {
-    console.error("Erreur critique initialisation Supabase:", e);
-    return null;
+  if (!SUPABASE_URL || !SUPABASE_KEY) {
+    console.warn("Supabase Config Missing. Using local storage fallback.");
+    // Tentative de secours ultime sur le localstorage si les env vars sont vides
+    const url = localStorage.getItem('MJA_SUPABASE_URL');
+    const key = localStorage.getItem('MJA_SUPABASE_ANON_KEY');
+    if (!url || !key) return null;
+    supabaseInstance = createClient(url, key);
+  } else {
+    try {
+      supabaseInstance = createClient(SUPABASE_URL, SUPABASE_KEY, {
+        auth: { persistSession: false }
+      });
+    } catch (e) {
+      console.error("Supabase Init Error:", e);
+      return null;
+    }
   }
+  return supabaseInstance;
 };
 
 export const saveSupabaseConfig = (url: string, key: string) => {
@@ -57,14 +60,8 @@ export const saveSupabaseConfig = (url: string, key: string) => {
 export const checkConnection = async (): Promise<boolean> => {
   const client = initSupabase();
   if (!client) return false;
-
   try {
-    // Utilisation d'un timeout court pour ne pas bloquer l'UI
-    const { error } = await Promise.race([
-      client.from('classes').select('id').limit(1),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 4000))
-    ]) as any;
-    
+    const { error } = await client.from('classes').select('id').limit(1);
     return !error;
   } catch (err) {
     return false;
@@ -75,8 +72,7 @@ export const db = {
   async fetchClasses(): Promise<ClassLevel[]> {
     const client = initSupabase();
     if (!client) return [];
-    const { data, error } = await client.from('classes').select('*').order('age', { ascending: true });
-    if (error) return [];
+    const { data } = await client.from('classes').select('*').order('age', { ascending: true });
     return data || [];
   },
   async syncClasses(classes: ClassLevel[]) {
@@ -87,8 +83,7 @@ export const db = {
   async fetchStudents(): Promise<Student[]> {
     const client = initSupabase();
     if (!client) return [];
-    const { data, error } = await client.from('students').select('*');
-    if (error) return [];
+    const { data } = await client.from('students').select('*');
     return data || [];
   },
   async syncStudents(students: Student[]) {
@@ -99,8 +94,7 @@ export const db = {
   async fetchSessions(): Promise<Session[]> {
     const client = initSupabase();
     if (!client) return [];
-    const { data, error } = await client.from('sessions').select('*');
-    if (error) return [];
+    const { data } = await client.from('sessions').select('*');
     return data || [];
   },
   async syncSessions(sessions: Session[]) {
@@ -111,14 +105,12 @@ export const db = {
   async fetchProgress(): Promise<Progress[]> {
     const client = initSupabase();
     if (!client) return [];
-    const { data, error } = await client.from('progress').select('*');
-    if (error) return [];
+    const { data } = await client.from('progress').select('*');
     return data || [];
   },
   async syncProgress(progress: Progress[]) {
     const client = initSupabase();
     if (!client) return;
-    // On nettoie les objets pour ne garder que les champs SQL
     const cleanProgress = progress.map(p => ({
       studentId: p.studentId,
       sessionId: p.sessionId,
@@ -132,8 +124,7 @@ export const db = {
   async fetchMessages(): Promise<Message[]> {
     const client = initSupabase();
     if (!client) return [];
-    const { data, error } = await client.from('messages').select('*').order('timestamp', { ascending: true });
-    if (error) return [];
+    const { data } = await client.from('messages').select('*').order('timestamp', { ascending: true });
     return data || [];
   },
   async sendMessage(message: Message) {
@@ -144,17 +135,12 @@ export const db = {
   async fetchInstructors(): Promise<Instructor[]> {
     const client = initSupabase();
     if (!client) return [];
-    try {
-      const { data, error } = await client.from('instructors').select('*');
-      if (error) return [];
-      return data || [];
-    } catch(e) { return []; }
+    const { data } = await client.from('instructors').select('*');
+    return data || [];
   },
   async syncInstructors(instructors: Instructor[]) {
     const client = initSupabase();
     if (!client) return;
-    try {
-      await client.from('instructors').upsert(instructors);
-    } catch(e) {}
+    await client.from('instructors').upsert(instructors);
   }
 };
