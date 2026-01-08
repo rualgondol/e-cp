@@ -54,7 +54,6 @@ const App: React.FC = () => {
         db.fetchInstructors()
       ]);
 
-      // On n'écrase les données que si le cloud renvoie quelque chose
       if (s && s.length > 0) setSessions(s);
       if (st && st.length > 0) setStudents(st);
       if (cl && cl.length > 0) setClasses(cl);
@@ -74,7 +73,6 @@ const App: React.FC = () => {
 
   useEffect(() => {
     loadCloudData();
-    
     const savedUser = localStorage.getItem('mja_user');
     if (savedUser) {
       try {
@@ -85,13 +83,11 @@ const App: React.FC = () => {
     }
   }, [loadCloudData]);
 
-  // Synchronisation automatique des instructeurs
   useEffect(() => {
     localStorage.setItem('mja_instructors', JSON.stringify(instructors));
     if (dbStatus === 'connected') db.syncInstructors(instructors);
   }, [instructors, dbStatus]);
 
-  // Helpers de mise à jour synchronisée
   const updateSessions = (newSessions: React.SetStateAction<Session[]>) => {
     setSessions(prev => {
       const next = typeof newSessions === 'function' ? newSessions(prev) : newSessions;
@@ -180,6 +176,7 @@ const App: React.FC = () => {
           onLogout={handleLogout}
           sessions={sessions}
           students={students}
+          onUpdateStudent={updateStudents}
           classes={classes}
           progress={progress}
           setProgress={updateProgress}

@@ -65,6 +65,7 @@ export type Student = {
   diseases: string[];
   allergies: string[];
   medications: string[];
+  password?: string;
   passwordChanged: boolean;
   temporaryPassword?: string;
 };
