@@ -2,28 +2,28 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Session, Student, ClassLevel, Progress, Message, Instructor } from '../types';
 
-// Fonction de récupération sécurisée des clés (Vercel / Vite / Local)
+/**
+ * Récupère une variable d'environnement de manière sécurisée 
+ * compatible avec Vercel (process.env) et Vite (import.meta.env)
+ */
 const getEnvVar = (name: string): string => {
+  // 1. Priorité aux variables injectées par Vercel/Node
   try {
-    // 1. Essai via process.env (Vercel / Node)
-    // @ts-ignore
     if (typeof process !== 'undefined' && process.env && process.env[name]) {
-      // @ts-ignore
       return process.env[name] as string;
     }
   } catch (e) {}
 
+  // 2. Repli sur Vite (import.meta.env)
   try {
-    // 2. Essai via import.meta.env (Vite)
-    // On accède directement à import.meta.env sans typeof sur 'import'
-    // @ts-ignore
-    if (import.meta.env && import.meta.env[name]) {
-      // @ts-ignore
-      return import.meta.env[name] as string;
+    // @ts-ignore - On évite d'utiliser le mot-clé 'import' seul pour ne pas casser le build
+    const metaEnv = (import.meta as any).env;
+    if (metaEnv && metaEnv[name]) {
+      return metaEnv[name] as string;
     }
   } catch (e) {}
 
-  // 3. Essai via localStorage (Configuration manuelle de secours)
+  // 3. Repli sur le localStorage (Config manuelle via Documentation)
   const localName = name.replace('NEXT_PUBLIC_', 'MJA_');
   return localStorage.getItem(localName) || "";
 };
@@ -41,7 +41,6 @@ export const initSupabase = (forceReinit: boolean = false): SupabaseClient | nul
   if (supabaseInstance && !forceReinit) return supabaseInstance;
   
   if (!SUPABASE_URL || !SUPABASE_KEY) {
-    console.warn("Supabase Config Missing in Env. Checking local storage fallback.");
     const url = localStorage.getItem('MJA_SUPABASE_URL');
     const key = localStorage.getItem('MJA_SUPABASE_ANON_KEY');
     if (!url || !key) return null;
