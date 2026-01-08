@@ -16,13 +16,9 @@ interface DocumentationProps {
 const Documentation: React.FC<DocumentationProps> = ({ club, students, classes, sessions, progress, instructors, dbStatus }) => {
   const [activeDocTab, setActiveDocTab] = useState<'system' | 'config' | 'deploy' | 'cheat'>('system');
   
-  // États pour Supabase
   const [url, setUrl] = useState(localStorage.getItem('MJA_SUPABASE_URL') || '');
   const [key, setKey] = useState(localStorage.getItem('MJA_SUPABASE_ANON_KEY') || '');
-  
-  // État pour Gemini
   const [geminiKey, setGeminiKey] = useState(localStorage.getItem('MJA_GEMINI_API_KEY') || '');
-  
   const [saveMsg, setSaveMsg] = useState('');
   const [syncLoading, setSyncLoading] = useState(false);
 
@@ -40,101 +36,34 @@ const Documentation: React.FC<DocumentationProps> = ({ club, students, classes, 
 
   const handleFullSync = async () => {
     if (dbStatus !== 'connected') {
-      alert("Veuillez d'abord connecter et enregistrer votre base de données Supabase.");
+      alert("Veuillez d'abord connecter votre base de données Supabase.");
       return;
     }
+    if (!confirm("Voulez-vous migrer vos données vers le Cloud ?")) return;
 
-    if (!confirm("Voulez-vous envoyer TOUTES les données (élèves, sessions, classes) vers le Cloud ? Attention : cela écrasera les données cloud existantes.")) return;
-
-    syncLoading(true);
+    setSyncLoading(true);
     try {
       await db.syncClasses(classes);
       await db.syncInstructors(instructors);
       await db.syncStudents(students);
       await db.syncSessions(sessions);
       await db.syncProgress(progress);
-      
-      setSaveMsg('🚀 Migration Cloud terminée avec succès !');
+      setSaveMsg('🚀 Migration Cloud réussie !');
     } catch (err) {
-      console.error(err);
-      alert("Erreur de migration : " + (err instanceof Error ? err.message : "Inconnue"));
+      alert("Erreur de migration.");
     } finally {
       setSyncLoading(false);
       setTimeout(() => setSaveMsg(''), 3000);
     }
   };
 
-  const fullSqlScript = `-- SCRIPT DE CRÉATION DES TABLES SUPABASE
-CREATE TABLE IF NOT EXISTS classes (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  age INTEGER,
-  club TEXT NOT NULL,
-  icon TEXT
-);
-
-CREATE TABLE IF NOT EXISTS instructors (
-  id TEXT PRIMARY KEY,
-  "fullName" TEXT NOT NULL,
-  username TEXT NOT NULL UNIQUE,
-  password TEXT NOT NULL,
-  role TEXT NOT NULL DEFAULT 'AVENTURIERS'
-);
-
-CREATE TABLE IF NOT EXISTS students (
-  id TEXT PRIMARY KEY,
-  "fullName" TEXT NOT NULL,
-  "birthDate" DATE,
-  age INTEGER,
-  "classId" TEXT REFERENCES classes(id),
-  photo TEXT,
-  address TEXT,
-  "motherName" TEXT,
-  "fatherName" TEXT,
-  "emergencyContacts" JSONB DEFAULT '[]',
-  diseases TEXT[] DEFAULT '{}',
-  allergies TEXT[] DEFAULT '{}',
-  medications TEXT[] DEFAULT '{}',
-  "passwordChanged" BOOLEAN DEFAULT false,
-  "temporaryPassword" TEXT
-);
-
-CREATE TABLE IF NOT EXISTS sessions (
-  id TEXT PRIMARY KEY,
-  club TEXT NOT NULL,
-  "classId" TEXT REFERENCES classes(id),
-  number INTEGER,
-  subjects JSONB DEFAULT '[]',
-  "availabilityDate" DATE
-);
-
-CREATE TABLE IF NOT EXISTS progress (
-  id BIGSERIAL PRIMARY KEY,
-  "studentId" TEXT REFERENCES students(id) ON DELETE CASCADE,
-  "sessionId" TEXT REFERENCES sessions(id) ON DELETE CASCADE,
-  score INTEGER,
-  completed BOOLEAN DEFAULT false,
-  "completedSubjects" TEXT[] DEFAULT '{}',
-  "completionDate" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  UNIQUE("studentId", "sessionId")
-);
-
-CREATE TABLE IF NOT EXISTS messages (
-  id TEXT PRIMARY KEY,
-  "senderId" TEXT NOT NULL,
-  "receiverId" TEXT NOT NULL,
-  content TEXT NOT NULL,
-  timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  "isRead" BOOLEAN DEFAULT false
-);`;
-
   return (
     <div className="bg-white rounded-3xl shadow-xl border border-gray-200 overflow-hidden h-[calc(100vh-220px)] flex flex-col">
       <div className="bg-gray-50 p-4 border-b flex gap-2 overflow-x-auto">
         {[
           { id: 'system', label: 'Architecture', icon: '🏛️' },
-          { id: 'config', label: 'Migration Initiale', icon: '💾' },
-          { id: 'deploy', label: 'Connexion Permanente (Vercel)', icon: '🚀' },
+          { id: 'config', label: 'Migration', icon: '💾' },
+          { id: 'deploy', label: 'Déploiement Vercel', icon: '🚀' },
           { id: 'cheat', label: 'Sécurité', icon: '🛡️' },
         ].map(tab => (
           <button
@@ -152,27 +81,19 @@ CREATE TABLE IF NOT EXISTS messages (
           <div className="max-w-3xl space-y-10 animate-fade-in">
              <div className="bg-blue-600 p-8 rounded-[3rem] text-white shadow-2xl relative overflow-hidden">
                 <div className="absolute -right-20 -top-20 text-[15rem] opacity-10">🚀</div>
-                <h3 className="text-2xl font-black uppercase tracking-tighter mb-4">Connexion Permanente pour tous</h3>
+                <h3 className="text-2xl font-black uppercase tracking-tighter mb-4">Connexion Permanente sur Vercel</h3>
                 <p className="text-blue-100 text-sm leading-relaxed mb-6 font-medium">
-                  Pour que vos 140 utilisateurs se connectent automatiquement sans jamais être déconnectés, vous devez configurer les variables d'environnement sur Vercel.
+                  Pour que vos élèves se connectent automatiquement, vous devez renommer vos variables avec le préfixe <strong>VITE_</strong> dans le tableau de bord Vercel.
                 </p>
                 <div className="bg-white/10 backdrop-blur-md p-6 rounded-2xl border border-white/20 space-y-4">
-                   <p className="text-[10px] font-black uppercase tracking-widest text-blue-200">Procédure Vercel :</p>
+                   <p className="text-[10px] font-black uppercase tracking-widest text-blue-200">Procédure Correcte :</p>
                    <ol className="text-xs space-y-3 font-bold">
-                      <li>1. Allez sur votre dashboard Vercel</li>
-                      <li>2. Settings {' > '} Environment Variables</li>
-                      <li>3. Ajoutez <code className="bg-white/20 px-2 py-0.5 rounded">NEXT_PUBLIC_SUPABASE_URL</code> avec votre URL</li>
-                      <li>4. Ajoutez <code className="bg-white/20 px-2 py-0.5 rounded">NEXT_PUBLIC_SUPABASE_ANON_KEY</code> avec votre Clé Anon</li>
-                      <li>5. Redéployez votre application</li>
+                      <li>1. Allez sur Vercel.com et ouvrez votre projet.</li>
+                      <li>2. Allez dans <strong>Settings</strong> puis <strong>Environment Variables</strong>.</li>
+                      <li>3. Ajoutez <code className="bg-white/20 px-2 py-0.5 rounded">VITE_SUPABASE_URL</code> avec votre URL.</li>
+                      <li>4. Ajoutez <code className="bg-white/20 px-2 py-0.5 rounded">VITE_SUPABASE_ANON_KEY</code> avec votre Clé Anon.</li>
+                      <li>5. <strong>IMPORTANT :</strong> Relancez un déploiement pour appliquer les changements.</li>
                    </ol>
-                </div>
-             </div>
-
-             <div className="space-y-6">
-                <h4 className="text-xl font-black text-gray-800 uppercase tracking-tighter border-l-4 border-blue-600 pl-4">Script SQL de création</h4>
-                <div className="bg-gray-900 text-green-400 p-6 rounded-3xl font-mono text-[10px] relative">
-                   <button onClick={() => { navigator.clipboard.writeText(fullSqlScript); alert('SQL Copié !'); }} className="absolute top-4 right-4 bg-gray-800 text-gray-400 px-3 py-1 rounded-lg text-[8px] hover:text-white">Copier</button>
-                   <pre className="overflow-x-auto">{fullSqlScript}</pre>
                 </div>
              </div>
           </div>
@@ -180,18 +101,10 @@ CREATE TABLE IF NOT EXISTS messages (
 
         {activeDocTab === 'config' && (
           <div className="max-w-xl space-y-8 animate-fade-in">
-            <h3 className="text-2xl font-black text-gray-800 tracking-tighter uppercase border-l-4 border-blue-600 pl-4">Migration Cloud</h3>
-            <p className="text-sm text-gray-500 font-medium">Utilisez cet outil pour envoyer vos données de démo actuelles vers votre base cloud toute neuve.</p>
-            
+            <h3 className="text-2xl font-black text-gray-800 tracking-tighter uppercase border-l-4 border-blue-600 pl-4">Configuration Manuelle</h3>
             <form onSubmit={handleSaveConfig} className="space-y-8">
-              <div className="bg-gray-50 p-8 rounded-[2.5rem] border border-gray-200 space-y-6 shadow-inner relative">
-                 <div className="absolute top-8 right-8 flex items-center gap-2">
-                    <span className={`text-[8px] font-black uppercase tracking-widest ${dbStatus === 'connected' ? 'text-green-600' : 'text-red-500'}`}>
-                        {dbStatus === 'connected' ? 'Cloud Prêt' : 'Cloud Déconnecté'}
-                    </span>
-                    <div className={`w-2 h-2 rounded-full ${dbStatus === 'connected' ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
-                 </div>
-                 <h4 className="text-xs font-black text-gray-900 uppercase tracking-widest">⚙️ Configuration de secours</h4>
+              <div className="bg-gray-50 p-8 rounded-[2.5rem] border border-gray-200 space-y-6 shadow-inner">
+                 <h4 className="text-xs font-black text-gray-900 uppercase tracking-widest">⚙️ Configuration Locale</h4>
                  <div>
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">URL du Projet</label>
                     <input type="text" value={url} onChange={e => setUrl(e.target.value)} placeholder="https://..." className="w-full border-2 border-gray-100 p-4 rounded-2xl font-mono text-xs focus:border-blue-500 outline-none" />
@@ -200,14 +113,13 @@ CREATE TABLE IF NOT EXISTS messages (
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Clé API (anon)</label>
                     <textarea value={key} onChange={e => setKey(e.target.value)} placeholder="eyJ..." className="w-full border-2 border-gray-100 p-4 rounded-2xl font-mono text-xs h-20 focus:border-blue-500 outline-none" />
                  </div>
-                 <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black text-[10px] uppercase shadow-lg">Sauvegarder localement</button>
+                 <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black text-[10px] uppercase shadow-lg">Sauvegarder dans ce navigateur</button>
               </div>
+              
+              {saveMsg && <p className="text-green-600 font-bold text-center text-xs">{saveMsg}</p>}
 
-               <div className="bg-amber-50 p-8 rounded-[2.5rem] border border-amber-100 space-y-4">
-                  <p className="text-xs text-amber-800 leading-relaxed font-bold">
-                    Une fois connecté (voyant vert), cliquez ici pour envoyer tous les élèves et séances vers Supabase.
-                  </p>
-                  <button type="button" onClick={handleFullSync} disabled={syncLoading || dbStatus !== 'connected'} className="w-full bg-amber-500 text-white py-5 rounded-2xl font-black text-[11px] uppercase shadow-xl hover:bg-amber-600 disabled:opacity-30">
+              <div className="bg-amber-50 p-8 rounded-[2.5rem] border border-amber-100 space-y-4">
+                  <button type="button" onClick={handleFullSync} disabled={syncLoading || dbStatus !== 'connected'} className="w-full bg-amber-500 text-white py-5 rounded-2xl font-black text-[11px] uppercase shadow-xl disabled:opacity-30">
                     {syncLoading ? '🚀 Synchronisation...' : '⬆️ Envoyer vers Supabase'}
                   </button>
                </div>
@@ -218,11 +130,11 @@ CREATE TABLE IF NOT EXISTS messages (
         {activeDocTab === 'system' && (
           <div className="max-w-4xl space-y-8 animate-fade-in text-center py-10">
             <div className="text-6xl mb-6">🌩️</div>
-            <h3 className="text-3xl font-black text-gray-800 tracking-tighter uppercase">Architecture Cloud Native</h3>
-            <p className="max-w-2xl mx-auto text-gray-500 font-medium">
-               Le système est conçu pour que la base de données soit le seul "Cerveau" de l'application. 
-               Dès que vous définissez vos clés sur Vercel, l'application devient indestructible. 
-               Même si un élève change de téléphone ou de tablette, il retrouvera sa progression en se connectant.
+            <h3 className="text-3xl font-black text-gray-800 tracking-tighter uppercase">Cloud Native</h3>
+            <p className="max-w-2xl mx-auto text-gray-500 font-medium leading-relaxed">
+               Le système e-CP MJA utilise Supabase pour stocker les données de 140 élèves. 
+               Une fois que vos variables <strong>VITE_</strong> sont configurées sur Vercel, 
+               tout le monde accède à la même base de données instantanément.
             </p>
           </div>
         )}
