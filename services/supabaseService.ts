@@ -1,15 +1,19 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { Session, Student, ClassLevel, Progress, Message } from '../types';
+import { Session, Student, ClassLevel, Progress, Message, Instructor } from '../types';
 
-// Récupération des clés (Vercel ou LocalStorage)
+// Récupération des clés : Vercel (Production) > LocalStorage (Développement/Override)
 const getSupabaseConfig = () => {
+  // Sur Vercel, ces variables doivent être définies dans le Dashboard Settings > Environment Variables
+  const envUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+  const envKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+  
   const localUrl = localStorage.getItem('MJA_SUPABASE_URL');
   const localKey = localStorage.getItem('MJA_SUPABASE_ANON_KEY');
   
   return {
-    url: localUrl || process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-    key: localKey || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
+    url: envUrl || localUrl || "",
+    key: envKey || localKey || ""
   };
 };
 
@@ -28,7 +32,14 @@ export const initSupabase = (forceReinit: boolean = false): SupabaseClient | nul
 
   try {
     supabaseInstance = createClient(url, key, {
-      auth: { persistSession: false, autoRefreshToken: false }
+      auth: { 
+        persistSession: false, 
+        autoRefreshToken: true,
+        detectSessionInUrl: false
+      },
+      global: {
+        headers: { 'x-application-name': 'e-cp-mja' }
+      }
     });
     return supabaseInstance;
   } catch (e) {
@@ -40,7 +51,7 @@ export const initSupabase = (forceReinit: boolean = false): SupabaseClient | nul
 export const saveSupabaseConfig = (url: string, key: string) => {
   localStorage.setItem('MJA_SUPABASE_URL', url);
   localStorage.setItem('MJA_SUPABASE_ANON_KEY', key);
-  initSupabase(true); // Forcer la réinitialisation avec les nouvelles clés
+  initSupabase(true); 
 };
 
 export const checkConnection = async (): Promise<boolean> => {
@@ -48,10 +59,12 @@ export const checkConnection = async (): Promise<boolean> => {
   if (!client) return false;
 
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
-    const { error } = await client.from('classes').select('id').limit(1);
-    clearTimeout(timeoutId);
+    // Utilisation d'un timeout court pour ne pas bloquer l'UI
+    const { error } = await Promise.race([
+      client.from('classes').select('id').limit(1),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 4000))
+    ]) as any;
+    
     return !error;
   } catch (err) {
     return false;
@@ -59,12 +72,11 @@ export const checkConnection = async (): Promise<boolean> => {
 };
 
 export const db = {
-  // ... (le reste de l'objet db reste identique à la version précédente)
   async fetchClasses(): Promise<ClassLevel[]> {
     const client = initSupabase();
     if (!client) return [];
     const { data, error } = await client.from('classes').select('*').order('age', { ascending: true });
-    if (error) throw error;
+    if (error) return [];
     return data || [];
   },
   async syncClasses(classes: ClassLevel[]) {
@@ -76,7 +88,7 @@ export const db = {
     const client = initSupabase();
     if (!client) return [];
     const { data, error } = await client.from('students').select('*');
-    if (error) throw error;
+    if (error) return [];
     return data || [];
   },
   async syncStudents(students: Student[]) {
@@ -88,7 +100,7 @@ export const db = {
     const client = initSupabase();
     if (!client) return [];
     const { data, error } = await client.from('sessions').select('*');
-    if (error) throw error;
+    if (error) return [];
     return data || [];
   },
   async syncSessions(sessions: Session[]) {
@@ -100,19 +112,28 @@ export const db = {
     const client = initSupabase();
     if (!client) return [];
     const { data, error } = await client.from('progress').select('*');
-    if (error) throw error;
+    if (error) return [];
     return data || [];
   },
   async syncProgress(progress: Progress[]) {
     const client = initSupabase();
     if (!client) return;
-    await client.from('progress').upsert(progress);
+    // On nettoie les objets pour ne garder que les champs SQL
+    const cleanProgress = progress.map(p => ({
+      studentId: p.studentId,
+      sessionId: p.sessionId,
+      score: p.score,
+      completed: p.completed,
+      completedSubjects: p.completedSubjects,
+      completionDate: p.completionDate
+    }));
+    await client.from('progress').upsert(cleanProgress, { onConflict: 'studentId,sessionId' });
   },
   async fetchMessages(): Promise<Message[]> {
     const client = initSupabase();
     if (!client) return [];
     const { data, error } = await client.from('messages').select('*').order('timestamp', { ascending: true });
-    if (error) throw error;
+    if (error) return [];
     return data || [];
   },
   async sendMessage(message: Message) {
@@ -120,8 +141,7 @@ export const db = {
     if (!client) return;
     await client.from('messages').insert([message]);
   },
-  // Nouveauté : Persistance des instructeurs si table existe
-  async fetchInstructors(): Promise<any[]> {
+  async fetchInstructors(): Promise<Instructor[]> {
     const client = initSupabase();
     if (!client) return [];
     try {
@@ -130,7 +150,7 @@ export const db = {
       return data || [];
     } catch(e) { return []; }
   },
-  async syncInstructors(instructors: any[]) {
+  async syncInstructors(instructors: Instructor[]) {
     const client = initSupabase();
     if (!client) return;
     try {

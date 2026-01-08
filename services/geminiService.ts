@@ -1,21 +1,13 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 
-// Fonction helper pour récupérer la clé API de manière sécurisée
-const getApiKey = () => {
-  try {
-    return process.env.API_KEY || "";
-  } catch {
-    return "";
-  }
+const getGeminiApiKey = () => {
+  return localStorage.getItem('MJA_GEMINI_API_KEY') || process.env.API_KEY || "";
 };
 
-/**
- * Generates course content based on subject and description using Gemini 3 Flash.
- */
 export async function generateSessionContent(title: string, subjectName: string, description: string) {
-  const apiKey = getApiKey();
-  if (!apiKey) return "Erreur : Clé API Gemini non configurée dans Vercel.";
+  const apiKey = getGeminiApiKey();
+  if (!apiKey) return "Erreur : La clé API Gemini n'est pas configurée dans la Documentation.";
 
   const ai = new GoogleGenAI({ apiKey });
   const prompt = `Génère un cours court pour un enfant JA (Aventurier/Explorateur). Thème: ${subjectName}. Objectif: ${description}. Format: HTML simple (h2, p, ul, li).`;
@@ -25,18 +17,15 @@ export async function generateSessionContent(title: string, subjectName: string,
       model: 'gemini-3-flash-preview',
       contents: prompt,
     });
-    return response.text || "Aucun contenu généré.";
+    return response.text || "Erreur de génération.";
   } catch (error) {
     console.error("Gemini Error:", error);
-    return "Erreur lors de la génération du contenu.";
+    return "Erreur Gemini : " + (error instanceof Error ? error.message : "Inconnue");
   }
 }
 
-/**
- * Generates a quiz for a given subject content with JSON schema validation.
- */
 export async function generateQuizForSubject(subjectName: string, content: string) {
-  const apiKey = getApiKey();
+  const apiKey = getGeminiApiKey();
   if (!apiKey) return [];
 
   const ai = new GoogleGenAI({ apiKey });
@@ -62,9 +51,7 @@ export async function generateQuizForSubject(subjectName: string, content: strin
         }
       }
     });
-    
-    const jsonStr = response.text?.trim() || "[]";
-    return JSON.parse(jsonStr);
+    return JSON.parse(response.text || "[]");
   } catch (error) {
     console.error("Gemini Quiz Error:", error);
     return [];
