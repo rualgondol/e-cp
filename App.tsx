@@ -4,7 +4,7 @@ import { Student, Session, Progress, Message, ClassLevel, Instructor } from './t
 import AdminDashboard from './components/Admin/AdminDashboard';
 import StudentPortal from './components/Student/StudentPortal';
 import Login from './components/Login';
-import { db, checkConnection } from './services/supabaseService';
+import { db, checkConnection, initSupabase } from './services/supabaseService';
 import { initialSessions, initialStudents, initialProgress, initialMessages } from './mockData';
 import { CLASSES } from './constants';
 
@@ -37,7 +37,6 @@ const App: React.FC = () => {
     const isOk = await checkConnection();
     
     if (!isOk) {
-      console.warn("Cloud connection failed. Using local/mock data.");
       setDbStatus('error');
       setIsDataReady(true);
       setLoading(false);
@@ -63,7 +62,6 @@ const App: React.FC = () => {
       
       setDbStatus('connected');
     } catch (err) {
-      console.error("Cloud data load error:", err);
       setDbStatus('error');
     } finally {
       setIsDataReady(true);
@@ -82,6 +80,44 @@ const App: React.FC = () => {
       }
     }
   }, [loadCloudData]);
+
+  // ABONNEMENTS REALTIME
+  useEffect(() => {
+    if (dbStatus !== 'connected') return;
+
+    // Écouter les progrès (Quizz/Validation cours)
+    const progressSub = db.subscribe('progress', (payload) => {
+      const newProg = payload.new as Progress;
+      setProgress(prev => {
+        const idx = prev.findIndex(p => p.studentId === newProg.studentId && p.sessionId === newProg.sessionId);
+        if (idx >= 0) {
+          const updated = [...prev];
+          updated[idx] = newProg;
+          return updated;
+        }
+        return [...prev, newProg];
+      });
+    });
+
+    // Écouter les messages
+    const messagesSub = db.subscribe('messages', (payload) => {
+      if (payload.eventType === 'INSERT') {
+        const newMsg = payload.new as Message;
+        setMessages(prev => {
+          if (prev.find(m => m.id === newMsg.id)) return prev;
+          return [...prev, newMsg];
+        });
+      } else if (payload.eventType === 'UPDATE') {
+        const updatedMsg = payload.new as Message;
+        setMessages(prev => prev.map(m => m.id === updatedMsg.id ? updatedMsg : m));
+      }
+    });
+
+    return () => {
+      progressSub?.unsubscribe();
+      messagesSub?.unsubscribe();
+    };
+  }, [dbStatus]);
 
   useEffect(() => {
     localStorage.setItem('mja_instructors', JSON.stringify(instructors));
@@ -114,6 +150,23 @@ const App: React.FC = () => {
     });
   };
 
+  const updateMessages = (newMessages: React.SetStateAction<Message[]>) => {
+    setMessages(prev => {
+      const next = typeof newMessages === 'function' ? newMessages(prev) : newMessages;
+      if (dbStatus === 'connected') {
+        const latest = next[next.length - 1];
+        // On envoie seulement si c'est un nouveau message (id non présent dans prev)
+        if (latest && !prev.find(m => m.id === latest.id)) {
+          db.sendMessage(latest).catch(e => console.error(e));
+        } else if (latest) {
+          // Sinon c'est peut-être un marquage comme lu
+          db.markMessageAsRead(latest.id).catch(e => console.error(e));
+        }
+      }
+      return next;
+    });
+  };
+
   const handleLogin = (type: 'admin' | 'student', id: string, role?: string) => {
     const userData = { type, id, role };
     setUser(userData);
@@ -135,7 +188,6 @@ const App: React.FC = () => {
           </div>
           <div>
             <p className="text-white text-[10px] font-black uppercase tracking-[0.4em] animate-pulse">Connexion Cloud MJA</p>
-            <p className="text-white/30 text-[8px] font-bold uppercase mt-2">Vérification de la base de données...</p>
           </div>
         </div>
       </div>
@@ -165,7 +217,7 @@ const App: React.FC = () => {
           progress={progress}
           setProgress={updateProgress}
           messages={messages}
-          setMessages={setMessages}
+          setMessages={updateMessages}
           instructors={instructors}
           setInstructors={setInstructors}
           dbStatus={dbStatus}
@@ -181,7 +233,7 @@ const App: React.FC = () => {
           progress={progress}
           setProgress={updateProgress}
           messages={messages}
-          setMessages={setMessages}
+          setMessages={updateMessages}
           dbStatus={dbStatus}
         />
       )}
