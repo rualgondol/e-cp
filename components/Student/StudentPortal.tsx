@@ -12,6 +12,7 @@ interface StudentPortalProps {
   onLogout: () => void;
   sessions: Session[];
   students: Student[];
+  onUpdateStudent: (newStudents: React.SetStateAction<Student[]>) => void;
   classes: ClassLevel[];
   progress: Progress[];
   setProgress: (newProgress: React.SetStateAction<Progress[]>) => void;
@@ -20,7 +21,7 @@ interface StudentPortalProps {
 }
 
 const StudentPortal: React.FC<StudentPortalProps> = ({ 
-  studentId, onLogout, sessions, students, classes, progress, setProgress, messages, setMessages 
+  studentId, onLogout, sessions, students, onUpdateStudent, classes, progress, setProgress, messages, setMessages 
 }) => {
   const [view, setView] = useState<'courses' | 'progress' | 'messages' | 'change-pwd'>('courses');
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -29,16 +30,13 @@ const StudentPortal: React.FC<StudentPortalProps> = ({
   const student = students.find(s => s.id === studentId);
   const studentClass = classes.find(c => c.id === student?.classId);
 
-  // Vérification mot de passe temporaire
-  if (student && !student.passwordChanged && view !== 'change-pwd') {
-    setView('change-pwd');
-  }
+  // Vérification mot de passe temporaire : forcer le changement si pas encore fait
+  const isPwdChangeRequired = student && !student.passwordChanged;
 
   const mySessions = useMemo(() => sessions.filter(s => s.classId === studentClass?.id).sort((a,b) => a.number - b.number), [sessions, studentClass]);
   const myProgress = progress.filter(p => p.studentId === studentId);
   const theme = studentClass ? THEMES[studentClass.club] : THEMES['AVENTURIERS'];
 
-  // Logique Linéaire : Une séance est accessible seulement si la précédente est complétée
   const getSessionStatus = (session: Session) => {
     const isPast = new Date(session.availabilityDate) <= new Date();
     if (!isPast) return 'locked-future';
@@ -52,23 +50,39 @@ const StudentPortal: React.FC<StudentPortalProps> = ({
   };
 
   const handleUpdatePassword = () => {
-    if (newPassword.length < 4) return alert("Mot de passe trop court");
-    // Logique simulée de mise à jour (nécessite syncStudents dans App)
-    alert("Mot de passe mis à jour !");
+    if (newPassword.length < 4) return alert("Mot de passe trop court (min 4 caractères)");
+    
+    // On met à jour l'élève dans la base
+    onUpdateStudent(prev => prev.map(s => 
+      s.id === studentId 
+        ? { ...s, password: newPassword, passwordChanged: true, temporaryPassword: "" } 
+        : s
+    ));
+    
+    alert("Mot de passe enregistré ! Bienvenue dans votre classe progressive.");
     setView('courses');
   };
 
   if (!student || !studentClass) return <div>Data Error</div>;
 
-  if (view === 'change-pwd') {
+  // Si le mot de passe n'a pas été changé, on n'affiche que l'écran de changement
+  if (isPwdChangeRequired && view !== 'change-pwd') {
     return (
-      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-6">
-         <div className="bg-white p-12 rounded-[3.5rem] shadow-2xl max-w-md w-full text-center space-y-8">
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-6 font-sans">
+         <div className="bg-white p-12 rounded-[3.5rem] shadow-2xl max-w-md w-full text-center space-y-8 animate-scale-in">
             <div className="text-6xl">🛡️</div>
             <h2 className="text-2xl font-black text-gray-900 uppercase">Sécurité Obligatoire</h2>
-            <p className="text-sm text-gray-400 font-medium">Vous utilisez un mot de passe temporaire. Pour continuer, veuillez définir votre propre mot de passe.</p>
-            <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Nouveau mot de passe" className="w-full border-2 border-gray-100 p-5 rounded-2xl font-bold text-center outline-none focus:border-blue-500" />
-            <button onClick={handleUpdatePassword} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black uppercase shadow-xl">Valider mon nouveau mot de passe</button>
+            <p className="text-sm text-gray-400 font-medium">C'est votre première connexion. Veuillez définir un mot de passe personnel pour protéger vos progrès.</p>
+            <div className="space-y-4">
+              <input 
+                type="password" 
+                value={newPassword} 
+                onChange={e => setNewPassword(e.target.value)} 
+                placeholder="Nouveau mot de passe" 
+                className="w-full border-2 border-gray-100 p-5 rounded-2xl font-bold text-center outline-none focus:border-blue-500 shadow-inner" 
+              />
+              <button onClick={handleUpdatePassword} className="w-full bg-[#004225] text-white py-5 rounded-2xl font-black uppercase shadow-xl hover:bg-black transition-all">Valider et Entrer</button>
+            </div>
          </div>
       </div>
     );
@@ -101,7 +115,6 @@ const StudentPortal: React.FC<StudentPortalProps> = ({
             onBack={() => setActiveSessionId(null)}
             theme={theme}
             onCompleteSubject={(subId, score) => {
-              // Logique de complétion
               setProgress(prev => {
                 const sIdx = prev.findIndex(p => p.studentId === studentId && p.sessionId === activeSessionId);
                 const curSession = mySessions.find(s => s.id === activeSessionId)!;
