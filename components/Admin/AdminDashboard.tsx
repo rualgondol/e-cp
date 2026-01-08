@@ -47,10 +47,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   });
   const [activeTab, setActiveTab] = useState<'sessions' | 'students' | 'tracking' | 'classes' | 'messages' | 'docs' | 'users'>('sessions');
   const [targetStudentChat, setTargetStudentChat] = useState<string | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const handleOpenChatWithStudent = (studentId: string) => {
     setTargetStudentChat(studentId);
     setActiveTab('messages');
+    if (window.innerWidth < 1024) setIsSidebarOpen(false);
   };
 
   const theme = THEMES[activeClub];
@@ -60,20 +62,46 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     messages.filter(m => m.receiverId === 'admin' && !m.isRead).length
   , [messages]);
 
+  const navItems = [
+    { id: 'sessions', label: '📂 Classe Progressive' },
+    { id: 'students', label: '👤 Jeunes' },
+    { id: 'tracking', label: '📊 Progression' },
+    { id: 'classes', label: '🏷️ Classes' },
+  ];
+
+  const adminNavItems = [
+    { id: 'users', label: '🔑 Accès Staff' },
+    { id: 'docs', label: '📜 Documentation' },
+  ];
+
+  const handleTabChange = (tab: any) => {
+    setActiveTab(tab);
+    setIsSidebarOpen(false);
+  };
+
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden font-sans">
-      <aside className={`w-72 flex flex-col ${theme.sidebar} text-white transition-all duration-500 shadow-2xl z-50`}>
-        <div className="p-8 border-b border-white/10">
-          <h1 className="text-2xl font-black uppercase tracking-tighter leading-none">e-CP MJA</h1>
-          <p className="text-[8px] opacity-60 uppercase font-black tracking-[0.2em] mt-2">Portail {currentUserRole}</p>
+      {/* Overlay for mobile sidebar */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden backdrop-blur-sm"
+          onClick={() => setIsSidebarOpen(false)}
+        ></div>
+      )}
+
+      <aside className={`fixed lg:static inset-y-0 left-0 w-72 flex flex-col ${theme.sidebar} text-white transition-all duration-300 shadow-2xl z-50 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
+        <div className="p-8 border-b border-white/10 flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-black uppercase tracking-tighter leading-none">e-CP MJA</h1>
+            <p className="text-[8px] opacity-60 uppercase font-black tracking-[0.2em] mt-2">Portail {currentUserRole}</p>
+          </div>
+          <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden text-2xl">✕</button>
         </div>
 
-        {/* Cloud Indicator */}
         <div className="px-6 mt-4">
            <CloudIndicator status={dbStatus} />
         </div>
 
-        {/* Modern Animated Club Switcher for ADMIN only */}
         {isAdmin && (
           <div className="px-6 py-4">
             <p className="text-[9px] font-black uppercase tracking-widest opacity-40 mb-3 ml-1">CLUB</p>
@@ -103,26 +131,34 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         <nav className="flex-1 overflow-y-auto px-4 py-2 space-y-6">
           <div className="space-y-1">
             <p className="px-4 text-[10px] font-black uppercase tracking-widest text-white/40 mb-2">Gestion</p>
-            <button onClick={() => setActiveTab('sessions')} className={`w-full text-left p-3 rounded-xl transition-all ${activeTab === 'sessions' ? 'bg-white/10 font-bold' : 'opacity-70 hover:bg-white/5'}`}>📂 Classe Progressive</button>
-            <button onClick={() => setActiveTab('students')} className={`w-full text-left p-3 rounded-xl transition-all ${activeTab === 'students' ? 'bg-white/10 font-bold' : 'opacity-70 hover:bg-white/5'}`}>👤 Jeunes</button>
-            <button onClick={() => setActiveTab('tracking')} className={`w-full text-left p-3 rounded-xl transition-all ${activeTab === 'tracking' ? 'bg-white/10 font-bold' : 'opacity-70 hover:bg-white/5'}`}>📊 Progression</button>
-            <button onClick={() => setActiveTab('classes')} className={`w-full text-left p-3 rounded-xl transition-all ${activeTab === 'classes' ? 'bg-white/10 font-bold' : 'opacity-70 hover:bg-white/5'}`}>🏷️ Classes</button>
+            {navItems.map(item => (
+              <button 
+                key={item.id}
+                onClick={() => handleTabChange(item.id as any)} 
+                className={`w-full text-left p-3 rounded-xl transition-all ${activeTab === item.id ? 'bg-white/10 font-bold' : 'opacity-70 hover:bg-white/5'}`}
+              >
+                {item.label}
+              </button>
+            ))}
           </div>
 
           <div className="space-y-1">
             <p className="px-4 text-[10px] font-black uppercase tracking-widest text-white/40 mb-2">Administration</p>
-            <button onClick={() => { setActiveTab('messages'); setTargetStudentChat(null); }} className={`w-full flex justify-between items-center p-3 rounded-xl transition-all ${activeTab === 'messages' ? 'bg-white/10 font-bold' : 'opacity-70 hover:bg-white/5'}`}>
+            <button onClick={() => { handleTabChange('messages'); setTargetStudentChat(null); }} className={`w-full flex justify-between items-center p-3 rounded-xl transition-all ${activeTab === 'messages' ? 'bg-white/10 font-bold' : 'opacity-70 hover:bg-white/5'}`}>
               <span className="flex items-center gap-2">💬 Messagerie</span>
               {unreadCount > 0 && (
                 <span className="bg-red-500 text-[10px] px-2 py-0.5 rounded-full animate-bounce shadow-lg shadow-red-500/50">{unreadCount}</span>
               )}
             </button>
-            {isAdmin && (
-              <>
-                <button onClick={() => setActiveTab('users')} className={`w-full text-left p-3 rounded-xl transition-all ${activeTab === 'users' ? 'bg-white/10 font-bold' : 'opacity-70 hover:bg-white/5'}`}>🔑 Accès Staff</button>
-                <button onClick={() => setActiveTab('docs')} className={`w-full text-left p-3 rounded-xl transition-all ${activeTab === 'docs' ? 'bg-white/10 font-bold' : 'opacity-70 hover:bg-white/5'}`}>📜 Documentation</button>
-              </>
-            )}
+            {isAdmin && adminNavItems.map(item => (
+              <button 
+                key={item.id}
+                onClick={() => handleTabChange(item.id as any)} 
+                className={`w-full text-left p-3 rounded-xl transition-all ${activeTab === item.id ? 'bg-white/10 font-bold' : 'opacity-70 hover:bg-white/5'}`}
+              >
+                {item.label}
+              </button>
+            ))}
           </div>
         </nav>
 
@@ -134,7 +170,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       </aside>
 
       <main className="flex-1 overflow-y-auto relative bg-[#F9FBFF] flex flex-col">
-        <div className="flex-1 p-8 lg:p-12">
+        {/* Mobile Header Toggle */}
+        <header className="lg:hidden p-4 bg-white border-b flex justify-between items-center sticky top-0 z-30">
+          <button onClick={() => setIsSidebarOpen(true)} className="p-2 bg-gray-100 rounded-lg text-xl">☰</button>
+          <div className="text-right">
+             <h2 className="text-xs font-black uppercase tracking-tighter text-gray-900 leading-none">e-CP MJA</h2>
+             <p className="text-[7px] font-bold text-gray-400 uppercase mt-1">Admin Panel</p>
+          </div>
+        </header>
+
+        <div className="flex-1 p-4 md:p-8 lg:p-12">
           <div className="max-w-7xl mx-auto">
             {activeTab === 'sessions' && <SessionManager club={activeClub} sessions={sessions.filter(s => s.club === activeClub)} setSessions={setSessions} classes={classes} />}
             {activeTab === 'students' && <StudentManager club={activeClub} students={students} setStudents={setStudents} classes={classes} progress={progress} messages={messages} setMessages={setMessages} />}
