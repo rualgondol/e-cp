@@ -24,7 +24,7 @@ interface StudentPortalProps {
 const CloudIndicator = ({ status }: { status: 'loading' | 'connected' | 'error' }) => {
   const color = status === 'connected' ? 'bg-green-500' : status === 'error' ? 'bg-red-500' : 'bg-orange-500';
   return (
-    <div className="flex items-center gap-2 px-3 py-1.5 bg-black/10 rounded-lg">
+    <div className="flex items-center gap-2 px-2 py-1 bg-black/10 rounded-lg">
       <div className={`w-1.5 h-1.5 rounded-full ${color} ${status === 'connected' ? 'animate-pulse shadow-[0_0_6px_rgba(34,197,94,0.6)]' : ''}`}></div>
       <span className="text-[7px] font-black uppercase tracking-widest opacity-60">Cloud {status === 'connected' ? 'OK' : 'ERR'}</span>
     </div>
@@ -66,37 +66,23 @@ const StudentPortal: React.FC<StudentPortalProps> = ({
 
   const handleUpdatePassword = () => {
     if (newPassword.length < 4) return alert("Mot de passe trop court (min 4 caractères)");
-    
-    // On met à jour l'élève dans la base
-    onUpdateStudent(prev => prev.map(s => 
-      s.id === studentId 
-        ? { ...s, password: newPassword, passwordChanged: true, temporaryPassword: "" } 
-        : s
-    ));
-    
-    alert("Mot de passe enregistré ! Bienvenue dans votre classe progressive.");
+    onUpdateStudent(prev => prev.map(s => s.id === studentId ? { ...s, password: newPassword, passwordChanged: true, temporaryPassword: "" } : s));
+    alert("Mot de passe enregistré ! Bienvenue.");
     setView('courses');
   };
 
   if (!student || !studentClass) return <div>Data Error</div>;
 
-  // Si le mot de passe n'a pas été changé, on n'affiche que l'écran de changement
   if (isPwdChangeRequired && view !== 'change-pwd') {
     return (
-      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-6 font-sans">
-         <div className="bg-white p-12 rounded-[3.5rem] shadow-2xl max-w-md w-full text-center space-y-8 animate-scale-in">
-            <div className="text-6xl">🛡️</div>
-            <h2 className="text-2xl font-black text-gray-900 uppercase">Sécurité Obligatoire</h2>
-            <p className="text-sm text-gray-400 font-medium">C'est votre première connexion. Veuillez définir un mot de passe personnel pour protéger vos progrès.</p>
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4 font-sans">
+         <div className="bg-white p-8 md:p-12 rounded-[2rem] md:rounded-[3.5rem] shadow-2xl max-w-md w-full text-center space-y-8 animate-scale-in">
+            <div className="text-5xl md:text-6xl">🛡️</div>
+            <h2 className="text-xl md:text-2xl font-black text-gray-900 uppercase">Sécurité Obligatoire</h2>
+            <p className="text-xs md:text-sm text-gray-400 font-medium leading-relaxed">Veuillez définir un mot de passe personnel pour protéger vos progrès.</p>
             <div className="space-y-4">
-              <input 
-                type="password" 
-                value={newPassword} 
-                onChange={e => setNewPassword(e.target.value)} 
-                placeholder="Nouveau mot de passe" 
-                className="w-full border-2 border-gray-100 p-5 rounded-2xl font-bold text-center outline-none focus:border-blue-500 shadow-inner" 
-              />
-              <button onClick={handleUpdatePassword} className="w-full bg-[#004225] text-white py-5 rounded-2xl font-black uppercase shadow-xl hover:bg-black transition-all">Valider et Entrer</button>
+              <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Nouveau mot de passe" className="w-full border-2 border-gray-100 p-4 rounded-2xl font-bold text-center outline-none focus:border-blue-500 shadow-inner" />
+              <button onClick={handleUpdatePassword} className="w-full bg-[#004225] text-white py-4 rounded-2xl font-black uppercase shadow-xl hover:bg-black transition-all">Valider</button>
             </div>
          </div>
       </div>
@@ -106,33 +92,35 @@ const StudentPortal: React.FC<StudentPortalProps> = ({
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 font-sans">
       <header className={`p-4 text-white shadow-xl sticky top-0 z-40 transition-all`} style={{ backgroundColor: theme.primary }}>
-        <div className="max-w-6xl mx-auto flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            <span className="text-2xl bg-white/10 w-10 h-10 flex items-center justify-center rounded-2xl shadow-inner overflow-hidden">
-                {studentClass.icon && studentClass.icon.length > 5 ? (
-                    <img src={studentClass.icon} className="w-full h-full object-cover" alt="" />
-                ) : studentClass.icon || '⛺'}
-            </span>
-            <div>
-              <h1 className="text-lg font-black leading-none">{student.fullName}</h1>
-              <div className="flex items-center gap-3 mt-1">
-                 <p className="text-[8px] opacity-70 uppercase font-black tracking-widest">{studentClass.name}</p>
-                 <CloudIndicator status={dbStatus} />
+        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
+          <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-start">
+            <div className="flex items-center gap-3">
+              <span className="text-xl bg-white/10 w-9 h-9 flex items-center justify-center rounded-xl shadow-inner overflow-hidden">
+                  {studentClass.icon && studentClass.icon.length > 5 ? (
+                      <img src={studentClass.icon} className="w-full h-full object-cover" alt="" />
+                  ) : studentClass.icon || '⛺'}
+              </span>
+              <div>
+                <h1 className="text-base font-black leading-none truncate max-w-[150px]">{student.fullName}</h1>
+                <div className="flex items-center gap-2 mt-0.5">
+                   <p className="text-[7px] opacity-70 uppercase font-black tracking-widest">{studentClass.name}</p>
+                   <CloudIndicator status={dbStatus} />
+                </div>
               </div>
             </div>
+            <button onClick={onLogout} className="sm:hidden bg-white/10 w-8 h-8 rounded-full flex items-center justify-center text-sm">🚪</button>
           </div>
-          <nav className="flex items-center gap-6">
-            <button onClick={() => {setView('courses'); setActiveSessionId(null);}} className={`text-[9px] font-black uppercase tracking-widest ${view === 'courses' ? 'border-b-2 border-white' : 'opacity-60'}`}>Cours</button>
-            <button onClick={() => {setView('progress'); setActiveSessionId(null);}} className={`text-[9px] font-black uppercase tracking-widest ${view === 'progress' ? 'border-b-2 border-white' : 'opacity-60'}`}>Record</button>
-            <button onClick={() => {setView('messages'); setActiveSessionId(null);}} className={`relative text-[9px] font-black uppercase tracking-widest ${view === 'messages' ? 'border-b-2 border-white' : 'opacity-60'}`}>
+          
+          <nav className="flex items-center justify-center gap-4 md:gap-8 w-full sm:w-auto border-t sm:border-t-0 border-white/10 pt-3 sm:pt-0">
+            <button onClick={() => {setView('courses'); setActiveSessionId(null);}} className={`text-[9px] font-black uppercase tracking-widest px-2 pb-1 ${view === 'courses' ? 'border-b-2 border-white' : 'opacity-60'}`}>Cours</button>
+            <button onClick={() => {setView('progress'); setActiveSessionId(null);}} className={`text-[9px] font-black uppercase tracking-widest px-2 pb-1 ${view === 'progress' ? 'border-b-2 border-white' : 'opacity-60'}`}>Record</button>
+            <button onClick={() => {setView('messages'); setActiveSessionId(null);}} className={`relative text-[9px] font-black uppercase tracking-widest px-2 pb-1 ${view === 'messages' ? 'border-b-2 border-white' : 'opacity-60'}`}>
                 Messages
                 {unreadCount > 0 && (
-                    <span className="absolute -top-2 -right-3 bg-red-500 text-[8px] w-4 h-4 flex items-center justify-center rounded-full border border-white animate-pulse">
-                        {unreadCount}
-                    </span>
+                    <span className="absolute -top-1.5 -right-2 bg-red-500 text-[7px] w-3.5 h-3.5 flex items-center justify-center rounded-full border border-white animate-pulse">{unreadCount}</span>
                 )}
             </button>
-            <button onClick={onLogout} className="bg-white/10 w-8 h-8 rounded-full flex items-center justify-center text-sm">🚪</button>
+            <button onClick={onLogout} className="hidden sm:flex bg-white/10 w-8 h-8 rounded-full items-center justify-center text-sm">🚪</button>
           </nav>
         </div>
       </header>
@@ -160,7 +148,7 @@ const StudentPortal: React.FC<StudentPortalProps> = ({
           />
         ) : (
           view === 'courses' ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 lg:gap-8 animate-fade-in">
               {mySessions.map(s => (
                 <CourseCard 
                   key={s.id} session={s} theme={theme}
