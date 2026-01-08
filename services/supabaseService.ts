@@ -54,7 +54,6 @@ export const saveSupabaseConfig = (url: string, key: string) => {
 };
 
 export const db = {
-  // Méthode pour écouter les changements en temps réel
   subscribe(table: string, callback: (payload: any) => void) {
     const client = initSupabase();
     if (!client) return null;
@@ -104,23 +103,18 @@ export const db = {
     return data || [];
   },
 
-  async syncProgress(progress: Progress[]) {
+  async syncProgressSingle(prog: Progress) {
     const client = initSupabase();
     if (!client) return;
-    // On ne synchronise que le dernier élément modifié pour plus de performance
-    const latest = progress[progress.length - 1];
-    if (!latest) return;
-    
     const { error } = await client.from('progress').upsert({
-      studentId: latest.studentId,
-      sessionId: latest.sessionId,
-      score: latest.score,
-      completed: latest.completed,
-      completedSubjects: latest.completedSubjects,
-      completionDate: latest.completionDate
+      studentId: prog.studentId,
+      sessionId: prog.sessionId,
+      score: prog.score,
+      completed: prog.completed,
+      completedSubjects: prog.completedSubjects,
+      completionDate: prog.completionDate
     }, { onConflict: 'studentId,sessionId' });
-    
-    if (error) console.error("Erreur sync progress:", error.message);
+    if (error) console.error("Supabase Upsert Error:", error.message);
   },
 
   async fetchMessages(): Promise<Message[]> {
@@ -133,8 +127,7 @@ export const db = {
   async sendMessage(message: Message) {
     const client = initSupabase();
     if (!client) return;
-    const { error } = await client.from('messages').insert([message]);
-    if (error) console.error("Erreur envoi message:", error.message);
+    await client.from('messages').insert([message]);
   },
 
   async markMessageAsRead(messageId: string) {
