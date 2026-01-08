@@ -7,11 +7,19 @@ interface AdminMessagingProps {
   students: Student[];
   messages: Message[];
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
+  initialStudentId?: string | null;
 }
 
-const AdminMessaging: React.FC<AdminMessagingProps> = ({ club, students, messages, setMessages }) => {
+const AdminMessaging: React.FC<AdminMessagingProps> = ({ club, students, messages, setMessages, initialStudentId }) => {
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
+
+  // S'auto-sélectionner si on vient d'un autre menu (ex: Progression)
+  useEffect(() => {
+    if (initialStudentId) {
+      setSelectedStudentId(initialStudentId);
+    }
+  }, [initialStudentId]);
 
   useEffect(() => {
     if (selectedStudentId) {
@@ -22,7 +30,12 @@ const AdminMessaging: React.FC<AdminMessagingProps> = ({ club, students, message
   }, [selectedStudentId, setMessages]);
 
   const conversationList = useMemo(() => {
+    // On inclut tous les élèves qui ont au moins un message ou celui spécifié
     const studentIds = Array.from(new Set(messages.map(m => m.senderId === 'admin' ? m.receiverId : m.senderId)));
+    if (initialStudentId && !studentIds.includes(initialStudentId)) {
+      studentIds.push(initialStudentId);
+    }
+    
     const chatStudents = students.filter(s => studentIds.includes(s.id));
     
     return chatStudents.map(s => {
@@ -31,8 +44,12 @@ const AdminMessaging: React.FC<AdminMessagingProps> = ({ club, students, message
       const unreadCount = studentMsgs.filter(m => m.receiverId === 'admin' && !m.isRead).length;
       
       return { student: s, lastMsg, unreadCount };
-    }).sort((a,b) => new Date(b.lastMsg.timestamp).getTime() - new Date(a.lastMsg.timestamp).getTime());
-  }, [messages, students]);
+    }).sort((a,b) => {
+      if (!a.lastMsg) return 1;
+      if (!b.lastMsg) return -1;
+      return new Date(b.lastMsg.timestamp).getTime() - new Date(a.lastMsg.timestamp).getTime();
+    });
+  }, [messages, students, initialStudentId]);
 
   const selectedStudent = useMemo(() => students.find(s => s.id === selectedStudentId), [students, selectedStudentId]);
   
@@ -73,7 +90,6 @@ const AdminMessaging: React.FC<AdminMessagingProps> = ({ club, students, message
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex justify-between items-start">
-                  {/* Correction: text-gray-900 pour une meilleure visibilité */}
                   <p className={`font-bold text-sm truncate ${selectedStudentId === item.student.id ? 'text-white' : 'text-gray-900'}`}>
                     {item.student.fullName}
                   </p>
@@ -81,9 +97,11 @@ const AdminMessaging: React.FC<AdminMessagingProps> = ({ club, students, message
                     <span className="bg-red-500 text-[8px] px-1.5 py-0.5 rounded-full font-black text-white">{item.unreadCount}</span>
                   )}
                 </div>
-                <p className={`text-[10px] truncate ${selectedStudentId === item.student.id ? 'text-white/70' : 'text-gray-500'}`}>
-                  {item.lastMsg.content}
-                </p>
+                {item.lastMsg && (
+                  <p className={`text-[10px] truncate ${selectedStudentId === item.student.id ? 'text-white/70' : 'text-gray-500'}`}>
+                    {item.lastMsg.content}
+                  </p>
+                )}
               </div>
             </div>
           )) : (
