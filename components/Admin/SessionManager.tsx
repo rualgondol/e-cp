@@ -97,15 +97,25 @@ const SessionManager: React.FC<SessionManagerProps> = ({ club, sessions, setSess
     setLoadingStates(prev => ({ ...prev, [`${idx}-content`]: 'content' }));
     const generated = await generateSessionContent(`Matière`, sub.name, sub.prerequisite);
     const subjects = [...(editingSession!.subjects!)];
-    // On convertit le HTML de l'IA en bloc simple pour Editor.js
     const editorData = { blocks: [{ type: 'paragraph', data: { text: generated } }] };
     subjects[idx] = { ...subjects[idx], content: JSON.stringify(editorData) };
     setEditingSession({ ...editingSession, subjects });
     setLoadingStates(prev => ({ ...prev, [`${idx}-content`]: null }));
   };
 
+  const handleAiQuiz = async (idx: number) => {
+    const sub = editingSession?.subjects?.[idx];
+    if (!sub?.name || !sub?.content) return alert("Veuillez d'abord générer ou écrire le contenu du cours.");
+    setLoadingStates(prev => ({ ...prev, [`${idx}-quiz`]: 'quiz' }));
+    const generatedQuiz = await generateQuizForSubject(sub.name, sub.content);
+    const subjects = [...(editingSession!.subjects!)];
+    subjects[idx] = { ...subjects[idx], quiz: generatedQuiz };
+    setEditingSession({ ...editingSession, subjects });
+    setLoadingStates(prev => ({ ...prev, [`${idx}-quiz`]: null }));
+  };
+
   return (
-    <div className="space-y-6 pb-20">
+    <div className="space-y-6 pb-20 font-sans">
       <div className="flex justify-between items-center bg-white p-6 rounded-3xl shadow-sm">
         <div className="flex gap-2">
           {classes.filter(c => c.club === club).map(cls => (
@@ -125,8 +135,9 @@ const SessionManager: React.FC<SessionManagerProps> = ({ club, sessions, setSess
             <h3 className="text-2xl font-black text-gray-900 mb-4">Semaine {session.number}</h3>
             <div className="space-y-3">
               {session.subjects.map((sub, i) => (
-                <div key={i} className="text-xs font-bold text-gray-600 bg-gray-50 p-4 rounded-2xl border border-gray-100">
-                  {sub.name}
+                <div key={i} className="flex justify-between items-center bg-gray-50 p-3 rounded-2xl border border-gray-100">
+                  <span className="text-xs font-bold text-gray-600">{sub.name}</span>
+                  {sub.quiz && sub.quiz.length > 0 && <span className="text-[8px] bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full font-black">QUIZ OK</span>}
                 </div>
               ))}
             </div>
@@ -143,6 +154,14 @@ const SessionManager: React.FC<SessionManagerProps> = ({ club, sessions, setSess
             </div>
 
             <div className="flex-1 overflow-y-auto p-10 space-y-10 custom-scrollbar">
+              <div className="bg-blue-50 p-6 rounded-3xl border border-blue-100 mb-6 flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Date de libération</p>
+                  <input type="date" value={editingSession.availabilityDate} onChange={e => setEditingSession({...editingSession, availabilityDate: e.target.value})} className="bg-transparent font-black text-blue-900 outline-none" />
+                </div>
+                <p className="text-[10px] font-bold text-blue-400 italic">La séance sera visible par les élèves à cette date.</p>
+              </div>
+
               {editingSession.subjects?.map((sub, idx) => (
                 <div key={sub.id} className="bg-white border-2 border-gray-100 rounded-[2.5rem] p-8 space-y-8 relative">
                   <div className="grid grid-cols-2 gap-8">
@@ -159,9 +178,14 @@ const SessionManager: React.FC<SessionManagerProps> = ({ club, sessions, setSess
                   </div>
                   
                   <div className="flex justify-between items-center mb-2">
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Contenu interactif (Editor.js)</p>
-                    <button onClick={() => handleAiContent(idx)} disabled={!!loadingStates[`${idx}-content`]} className="text-[9px] bg-indigo-50 text-indigo-600 font-black px-4 py-2 rounded-xl border border-indigo-100">
-                      {loadingStates[`${idx}-content`] ? 'Génération...' : '✨ Générer avec Gemini'}
+                    <div className="flex gap-4">
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Contenu (Editor.js)</p>
+                      <button onClick={() => handleAiContent(idx)} disabled={!!loadingStates[`${idx}-content`]} className="text-[9px] bg-indigo-50 text-indigo-600 font-black px-4 py-2 rounded-xl border border-indigo-100 hover:bg-indigo-100 transition">
+                        {loadingStates[`${idx}-content`] ? 'Génération...' : '✨ Générer Cours'}
+                      </button>
+                    </div>
+                    <button onClick={() => handleAiQuiz(idx)} disabled={!!loadingStates[`${idx}-quiz`]} className={`text-[9px] font-black px-4 py-2 rounded-xl border transition ${sub.quiz ? 'bg-green-50 text-green-600 border-green-100' : 'bg-amber-50 text-amber-600 border-amber-100 hover:bg-amber-100'}`}>
+                      {loadingStates[`${idx}-quiz`] ? 'Génération...' : sub.quiz ? '✅ Quiz Généré' : '📝 Générer Quiz'}
                     </button>
                   </div>
 
@@ -172,11 +196,11 @@ const SessionManager: React.FC<SessionManagerProps> = ({ club, sessions, setSess
                   }} />
                 </div>
               ))}
-              <button onClick={addSubject} className="w-full border-4 border-dashed border-gray-100 p-6 rounded-[2.5rem] text-gray-300 font-black uppercase tracking-widest hover:border-blue-200 hover:text-blue-300 transition">+ Ajouter un bloc de cours</button>
+              <button onClick={addSubject} className="w-full border-4 border-dashed border-gray-100 p-6 rounded-[2.5rem] text-gray-300 font-black uppercase tracking-widest hover:border-blue-200 hover:text-blue-300 transition">+ Ajouter une matière</button>
             </div>
 
             <div className="p-10 border-t flex justify-end gap-4">
-               <button onClick={handleSave} className="bg-blue-600 text-white px-12 py-5 rounded-2xl font-black text-sm uppercase shadow-2xl hover:bg-blue-700 transition">Enregistrer la Semaine</button>
+               <button onClick={handleSave} className="bg-blue-600 text-white px-12 py-5 rounded-2xl font-black text-sm uppercase shadow-2xl hover:bg-blue-700 transition">Enregistrer Semaine</button>
             </div>
           </div>
         </div>
