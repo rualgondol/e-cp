@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Student, Session, Progress, Message, ClassLevel, Instructor } from './types';
 import AdminDashboard from './components/Admin/AdminDashboard';
 import StudentPortal from './components/Student/StudentPortal';
@@ -20,6 +20,7 @@ const App: React.FC = () => {
   const [user, setUser] = useState<{ type: 'admin' | 'student'; id: string; role?: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [dbStatus, setDbStatus] = useState<'loading' | 'connected' | 'error'>('loading');
+  const [isDataReady, setIsDataReady] = useState(false);
   
   const [sessions, setSessions] = useState<Session[]>(initialSessions);
   const [students, setStudents] = useState<Student[]>(initialStudents);
@@ -31,43 +32,48 @@ const App: React.FC = () => {
     return saved ? JSON.parse(saved) : [DEFAULT_ADMIN];
   });
 
-  useEffect(() => {
-    const connectAndLoad = async () => {
-      setLoading(true);
-      const isOk = await checkConnection();
+  const loadCloudData = useCallback(async () => {
+    setIsDataReady(false);
+    const isOk = await checkConnection();
+    
+    if (!isOk) {
+      console.warn("Cloud connection failed. Using local/mock data.");
+      setDbStatus('error');
+      setIsDataReady(true);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const [s, st, cl, p, m, ins] = await Promise.all([
+        db.fetchSessions(),
+        db.fetchStudents(),
+        db.fetchClasses(),
+        db.fetchProgress(),
+        db.fetchMessages(),
+        db.fetchInstructors()
+      ]);
+
+      // On n'écrase les données que si le cloud renvoie quelque chose
+      if (s && s.length > 0) setSessions(s);
+      if (st && st.length > 0) setStudents(st);
+      if (cl && cl.length > 0) setClasses(cl);
+      if (p && p.length > 0) setProgress(p);
+      if (m && m.length > 0) setMessages(m);
+      if (ins && ins.length > 0) setInstructors(ins);
       
-      if (!isOk) {
-        setDbStatus('error');
-        setLoading(false);
-        return;
-      }
+      setDbStatus('connected');
+    } catch (err) {
+      console.error("Cloud data load error:", err);
+      setDbStatus('error');
+    } finally {
+      setIsDataReady(true);
+      setLoading(false);
+    }
+  }, []);
 
-      try {
-        const [s, st, cl, p, m, ins] = await Promise.all([
-          db.fetchSessions(),
-          db.fetchStudents(),
-          db.fetchClasses(),
-          db.fetchProgress(),
-          db.fetchMessages(),
-          db.fetchInstructors()
-        ]);
-
-        if (s && s.length > 0) setSessions(s);
-        if (st && st.length > 0) setStudents(st);
-        if (cl && cl.length > 0) setClasses(cl);
-        if (p && p.length > 0) setProgress(p);
-        if (m && m.length > 0) setMessages(m);
-        if (ins && ins.length > 0) setInstructors(ins);
-        
-        setDbStatus('connected');
-      } catch (err) {
-        setDbStatus('error');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    connectAndLoad();
+  useEffect(() => {
+    loadCloudData();
     
     const savedUser = localStorage.getItem('mja_user');
     if (savedUser) {
@@ -77,7 +83,7 @@ const App: React.FC = () => {
         localStorage.removeItem('mja_user');
       }
     }
-  }, []);
+  }, [loadCloudData]);
 
   // Synchronisation automatique des instructeurs
   useEffect(() => {
@@ -85,7 +91,7 @@ const App: React.FC = () => {
     if (dbStatus === 'connected') db.syncInstructors(instructors);
   }, [instructors, dbStatus]);
 
-  // Helper pour mettre à jour et synchroniser les sessions
+  // Helpers de mise à jour synchronisée
   const updateSessions = (newSessions: React.SetStateAction<Session[]>) => {
     setSessions(prev => {
       const next = typeof newSessions === 'function' ? newSessions(prev) : newSessions;
@@ -94,14 +100,20 @@ const App: React.FC = () => {
     });
   };
 
-  // Helper pour mettre à jour et synchroniser la progression (Automatique pour les élèves)
   const updateProgress = (newProgress: React.SetStateAction<Progress[]>) => {
     setProgress(prev => {
       const next = typeof newProgress === 'function' ? newProgress(prev) : newProgress;
       if (dbStatus === 'connected') {
-        // On synchronise vers le cloud de manière asynchrone sans bloquer l'UI
         db.syncProgress(next).catch(e => console.error("Sync Progress Error:", e));
       }
+      return next;
+    });
+  };
+
+  const updateStudents = (newStudents: React.SetStateAction<Student[]>) => {
+    setStudents(prev => {
+      const next = typeof newStudents === 'function' ? newStudents(prev) : newStudents;
+      if (dbStatus === 'connected') db.syncStudents(next).catch(e => console.error(e));
       return next;
     });
   };
@@ -117,12 +129,18 @@ const App: React.FC = () => {
     localStorage.removeItem('mja_user');
   };
 
-  if (loading && dbStatus === 'loading') {
+  if (loading && !isDataReady) {
     return (
-      <div className="min-h-screen bg-[#004225] flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-white/20 border-t-white rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-white text-[10px] font-black uppercase tracking-[0.2em]">Chargement e-CP MJA...</p>
+      <div className="min-h-screen bg-[#004225] flex items-center justify-center font-sans">
+        <div className="text-center space-y-6">
+          <div className="relative w-20 h-20 mx-auto">
+             <div className="absolute inset-0 border-4 border-white/10 rounded-full"></div>
+             <div className="absolute inset-0 border-4 border-t-yellow-400 rounded-full animate-spin"></div>
+          </div>
+          <div>
+            <p className="text-white text-[10px] font-black uppercase tracking-[0.4em] animate-pulse">Connexion Cloud MJA</p>
+            <p className="text-white/30 text-[8px] font-bold uppercase mt-2">Vérification de la base de données...</p>
+          </div>
         </div>
       </div>
     );
@@ -136,7 +154,7 @@ const App: React.FC = () => {
           students={students} 
           instructors={instructors}
           dbStatus={dbStatus}
-          isLoading={loading}
+          isLoading={!isDataReady}
         />
       ) : user.type === 'admin' ? (
         <AdminDashboard 
@@ -145,7 +163,7 @@ const App: React.FC = () => {
           sessions={sessions}
           setSessions={updateSessions}
           students={students}
-          setStudents={setStudents}
+          setStudents={updateStudents}
           classes={classes}
           setClasses={setClasses}
           progress={progress}
