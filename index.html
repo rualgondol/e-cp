@@ -8,13 +8,9 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
-    <!-- Editor.js Core and Tools -->
-    <script src="https://cdn.jsdelivr.net/npm/@editorjs/editorjs@latest"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@editorjs/header@latest"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@editorjs/list@latest"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@editorjs/table@latest"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@editorjs/image@latest"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@editorjs/paragraph@latest"></script>
+    <!-- Quill 2.0 Core and Snow Theme -->
+    <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
 
     <style>
         body {
@@ -25,16 +21,22 @@
         .royal-blue { background-color: #002366; }
         .gold { background-color: #D4AF37; }
 
-        /* Editor.js Customizations */
-        .editorjs-wrapper {
-            background-color: white;
-            border-radius: 1.5rem;
-            padding: 2rem;
-            border: 2px solid #f1f5f9;
-            min-height: 400px;
+        /* Quill Customizations */
+        .ql-container {
+            font-family: 'Inter', sans-serif !important;
+            font-size: 16px !important;
+            border-bottom-left-radius: 1.5rem !important;
+            border-bottom-right-radius: 1.5rem !important;
         }
-        .ce-block__content, .ce-toolbar__content {
-            max-width: 100% !important;
+        .ql-toolbar {
+            font-family: 'Inter', sans-serif !important;
+            border-top-left-radius: 1.5rem !important;
+            border-top-right-radius: 1.5rem !important;
+            background: #f8fafc !important;
+            border-color: #f1f5f9 !important;
+        }
+        .ql-editor {
+            min-height: 300px;
         }
 
         .global-footer {
