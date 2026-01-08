@@ -81,11 +81,10 @@ const App: React.FC = () => {
     }
   }, [loadCloudData]);
 
-  // ABONNEMENTS REALTIME
+  // ABONNEMENTS REALTIME (Écoute en direct des changements dans la base)
   useEffect(() => {
     if (dbStatus !== 'connected') return;
 
-    // Écouter les progrès (Quizz/Validation cours)
     const progressSub = db.subscribe('progress', (payload) => {
       const newProg = payload.new as Progress;
       setProgress(prev => {
@@ -99,7 +98,6 @@ const App: React.FC = () => {
       });
     });
 
-    // Écouter les messages
     const messagesSub = db.subscribe('messages', (payload) => {
       if (payload.eventType === 'INSERT') {
         const newMsg = payload.new as Message;
@@ -113,9 +111,15 @@ const App: React.FC = () => {
       }
     });
 
+    const studentsSub = db.subscribe('students', (payload) => {
+      const updatedStudent = payload.new as Student;
+      setStudents(prev => prev.map(s => s.id === updatedStudent.id ? updatedStudent : s));
+    });
+
     return () => {
       progressSub?.unsubscribe();
       messagesSub?.unsubscribe();
+      studentsSub?.unsubscribe();
     };
   }, [dbStatus]);
 
@@ -136,7 +140,11 @@ const App: React.FC = () => {
     setProgress(prev => {
       const next = typeof newProgress === 'function' ? newProgress(prev) : newProgress;
       if (dbStatus === 'connected') {
-        db.syncProgress(next).catch(e => console.error("Sync Progress Error:", e));
+        // Au lieu de deviner le dernier, on cherche celui qui diffère de `prev`
+        const changed = next.find((p, i) => JSON.stringify(p) !== JSON.stringify(prev[i])) || next[next.length - 1];
+        if (changed) {
+           db.syncProgressSingle(changed).catch(e => console.error("Sync Progress Error:", e));
+        }
       }
       return next;
     });
@@ -155,11 +163,9 @@ const App: React.FC = () => {
       const next = typeof newMessages === 'function' ? newMessages(prev) : newMessages;
       if (dbStatus === 'connected') {
         const latest = next[next.length - 1];
-        // On envoie seulement si c'est un nouveau message (id non présent dans prev)
         if (latest && !prev.find(m => m.id === latest.id)) {
           db.sendMessage(latest).catch(e => console.error(e));
         } else if (latest) {
-          // Sinon c'est peut-être un marquage comme lu
           db.markMessageAsRead(latest.id).catch(e => console.error(e));
         }
       }
@@ -186,9 +192,7 @@ const App: React.FC = () => {
              <div className="absolute inset-0 border-4 border-white/10 rounded-full"></div>
              <div className="absolute inset-0 border-4 border-t-yellow-400 rounded-full animate-spin"></div>
           </div>
-          <div>
-            <p className="text-white text-[10px] font-black uppercase tracking-[0.4em] animate-pulse">Connexion Cloud MJA</p>
-          </div>
+          <div><p className="text-white text-[10px] font-black uppercase tracking-[0.4em] animate-pulse">Connexion Cloud MJA</p></div>
         </div>
       </div>
     );
@@ -197,43 +201,24 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen relative">
       {!user ? (
-        <Login 
-          onLogin={handleLogin} 
-          students={students} 
-          instructors={instructors}
-          dbStatus={dbStatus}
-          isLoading={!isDataReady}
-        />
+        <Login onLogin={handleLogin} students={students} instructors={instructors} dbStatus={dbStatus} isLoading={!isDataReady} />
       ) : user.type === 'admin' ? (
         <AdminDashboard 
-          onLogout={handleLogout}
-          currentUserRole={user.role || 'ADMIN'}
-          sessions={sessions}
-          setSessions={updateSessions}
-          students={students}
-          setStudents={updateStudents}
-          classes={classes}
-          setClasses={setClasses}
-          progress={progress}
-          setProgress={updateProgress}
-          messages={messages}
-          setMessages={updateMessages}
-          instructors={instructors}
-          setInstructors={setInstructors}
+          onLogout={handleLogout} currentUserRole={user.role || 'ADMIN'}
+          sessions={sessions} setSessions={updateSessions}
+          students={students} setStudents={updateStudents}
+          classes={classes} setClasses={setClasses}
+          progress={progress} setProgress={updateProgress}
+          messages={messages} setMessages={updateMessages}
+          instructors={instructors} setInstructors={setInstructors}
           dbStatus={dbStatus}
         />
       ) : (
         <StudentPortal 
-          studentId={user.id}
-          onLogout={handleLogout}
-          sessions={sessions}
-          students={students}
-          onUpdateStudent={updateStudents}
-          classes={classes}
-          progress={progress}
-          setProgress={updateProgress}
-          messages={messages}
-          setMessages={updateMessages}
+          studentId={user.id} onLogout={handleLogout}
+          sessions={sessions} students={students} onUpdateStudent={updateStudents}
+          classes={classes} progress={progress} setProgress={updateProgress}
+          messages={messages} setMessages={updateMessages}
           dbStatus={dbStatus}
         />
       )}
