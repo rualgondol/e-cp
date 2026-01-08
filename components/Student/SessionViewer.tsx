@@ -24,21 +24,6 @@ const SessionViewer: React.FC<SessionViewerProps> = ({ session, progress, onComp
     setShowQuiz(true);
   };
 
-  const parseEditorJS = (content: string) => {
-    try {
-      if (content.startsWith('{')) {
-        const data = JSON.parse(content);
-        return data.blocks.map((b: any, i: number) => {
-          if (b.type === 'paragraph') return `<p key=${i} class="mb-4">${b.data.text}</p>`;
-          if (b.type === 'header') return `<h${b.data.level} key=${i} class="text-2xl font-black mb-4">${b.data.text}</h${b.data.level}>`;
-          if (b.type === 'list') return `<ul key=${i} class="list-disc pl-6 mb-4">${b.data.items.map((it: string) => `<li>${it}</li>`).join('')}</ul>`;
-          return '';
-        }).join('');
-      }
-      return content;
-    } catch(e) { return content; }
-  };
-
   const handleSubmitQuiz = () => {
     if (!activeSubject?.quiz || !activeSubjectId) return;
     let correct = 0;
@@ -68,12 +53,12 @@ const SessionViewer: React.FC<SessionViewerProps> = ({ session, progress, onComp
         {!activeSubjectId ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {session.subjects.map((sub, i) => (
-              <div key={sub.id} onClick={() => setActiveSubjectId(sub.id)} className={`p-10 rounded-[2.5rem] border-4 transition-all cursor-pointer flex flex-col justify-between ${isSubjectCompleted(sub.id) ? 'bg-green-50 border-green-200' : 'bg-white border-gray-50 hover:border-blue-400 hover:shadow-2xl hover:-translate-y-2'}`}>
-                 <div>
-                    <h3 className="text-2xl font-black text-gray-900 mb-1 leading-none">{sub.name}</h3>
-                    <p className="text-xs text-gray-400 font-bold italic">Pre-requis: {sub.prerequisite}</p>
+              <div key={sub.id} onClick={() => setActiveSubjectId(sub.id)} className={`p-10 rounded-[2.5rem] border-4 transition-all cursor-pointer flex flex-col justify-between ${isSubjectCompleted(sub.id) ? 'bg-green-50 border-green-200' : 'bg-white border-gray-100 hover:border-blue-400 hover:shadow-2xl hover:-translate-y-2'}`}>
+                 <div className="space-y-2">
+                    <h3 className="text-2xl font-black text-gray-900 leading-tight">{sub.name}</h3>
+                    <p className="text-xs text-gray-400 font-bold italic leading-relaxed">Pre-requis: {sub.prerequisite}</p>
                  </div>
-                 <div className="mt-8 flex items-center justify-between">
+                 <div className="mt-8 flex items-center justify-between pt-6 border-t border-gray-100">
                     <span className="text-[9px] font-black uppercase text-blue-600 tracking-widest">{isSubjectCompleted(sub.id) ? 'Complété' : 'Étudier →'}</span>
                     {isSubjectCompleted(sub.id) && <span className="text-green-500">✅</span>}
                  </div>
@@ -83,7 +68,7 @@ const SessionViewer: React.FC<SessionViewerProps> = ({ session, progress, onComp
         ) : (
           !showQuiz ? (
             <div className="max-w-3xl mx-auto space-y-12">
-               <div className="prose prose-blue prose-lg max-w-none text-gray-700 font-medium" dangerouslySetInnerHTML={{ __html: parseEditorJS(activeSubject.content) }} />
+               <div className="prose prose-blue prose-lg max-w-none text-gray-700 font-medium quill-content" dangerouslySetInnerHTML={{ __html: activeSubject.content }} />
                {activeSubject.quiz && (
                  <button onClick={handleStartQuiz} className="w-full bg-yellow-500 text-white py-6 rounded-[2rem] font-black text-xl uppercase shadow-2xl hover:scale-105 transition-transform">Lancer le Quiz ⚡</button>
                )}

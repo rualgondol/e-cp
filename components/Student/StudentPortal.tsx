@@ -37,6 +37,10 @@ const StudentPortal: React.FC<StudentPortalProps> = ({
   const myProgress = progress.filter(p => p.studentId === studentId);
   const theme = studentClass ? THEMES[studentClass.club] : THEMES['AVENTURIERS'];
 
+  const unreadCount = useMemo(() => 
+    messages.filter(m => m.receiverId === studentId && !m.isRead).length
+  , [messages, studentId]);
+
   const getSessionStatus = (session: Session) => {
     const isPast = new Date(session.availabilityDate) <= new Date();
     if (!isPast) return 'locked-future';
@@ -93,15 +97,27 @@ const StudentPortal: React.FC<StudentPortalProps> = ({
       <header className={`p-6 text-white shadow-xl sticky top-0 z-40 transition-all`} style={{ backgroundColor: theme.primary }}>
         <div className="max-w-6xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-5">
-            <span className="text-4xl bg-white/10 w-14 h-14 flex items-center justify-center rounded-3xl shadow-inner">{studentClass.icon || '⛺'}</span>
+            <span className="text-4xl bg-white/10 w-14 h-14 flex items-center justify-center rounded-3xl shadow-inner overflow-hidden">
+                {studentClass.icon && studentClass.icon.length > 5 ? (
+                    <img src={studentClass.icon} className="w-full h-full object-cover" alt="" />
+                ) : studentClass.icon || '⛺'}
+            </span>
             <div>
               <h1 className="text-2xl font-black leading-none">{student.fullName}</h1>
               <p className="text-[10px] opacity-70 uppercase font-black tracking-widest mt-1">{studentClass.name} • Toujours prêt</p>
             </div>
           </div>
           <nav className="flex items-center gap-8">
-            <button onClick={() => setView('courses')} className={`text-[10px] font-black uppercase tracking-widest ${view === 'courses' ? 'border-b-2 border-white' : 'opacity-60'}`}>Cours</button>
-            <button onClick={() => setView('progress')} className={`text-[10px] font-black uppercase tracking-widest ${view === 'progress' ? 'border-b-2 border-white' : 'opacity-60'}`}>Record</button>
+            <button onClick={() => {setView('courses'); setActiveSessionId(null);}} className={`text-[10px] font-black uppercase tracking-widest ${view === 'courses' ? 'border-b-2 border-white' : 'opacity-60'}`}>Cours</button>
+            <button onClick={() => {setView('progress'); setActiveSessionId(null);}} className={`text-[10px] font-black uppercase tracking-widest ${view === 'progress' ? 'border-b-2 border-white' : 'opacity-60'}`}>Record</button>
+            <button onClick={() => {setView('messages'); setActiveSessionId(null);}} className={`relative text-[10px] font-black uppercase tracking-widest ${view === 'messages' ? 'border-b-2 border-white' : 'opacity-60'}`}>
+                Messages
+                {unreadCount > 0 && (
+                    <span className="absolute -top-2 -right-3 bg-red-500 text-[8px] w-4 h-4 flex items-center justify-center rounded-full border border-white animate-pulse">
+                        {unreadCount}
+                    </span>
+                )}
+            </button>
             <button onClick={onLogout} className="bg-white/10 w-10 h-10 rounded-full flex items-center justify-center">🚪</button>
           </nav>
         </div>
@@ -142,12 +158,15 @@ const StudentPortal: React.FC<StudentPortalProps> = ({
             </div>
           ) : view === 'progress' ? (
             <ProgressRecord student={student} sessions={mySessions} progress={myProgress} theme={theme} />
+          ) : view === 'messages' ? (
+            <Messaging studentId={studentId} messages={messages} setMessages={setMessages} theme={theme} />
           ) : null
         )}
       </main>
 
       <footer className="global-footer">
-          e-CP MJA - Classe progressive des clubs juniors MJA - by Kuvasz Fidèle
+          Copyright © 2026 e-CP MJA - Tous droits réservés. <br/>
+          by Kuvasz Fidèle
       </footer>
     </div>
   );
