@@ -3,33 +3,47 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Session, Student, ClassLevel, Progress, Message, Instructor } from '../types';
 
 /**
- * Récupère une variable d'environnement de manière sécurisée 
- * compatible avec Vercel (process.env) et Vite (import.meta.env)
+ * Récupère une variable d'environnement de manière sécurisée.
+ * Priorité : 
+ * 1. LocalStorage (Config manuelle)
+ * 2. VITE_ prefix (Standard Vite/Vercel)
+ * 3. NEXT_PUBLIC_ prefix (Ancien standard)
+ * 4. process.env (Node/Vercel)
  */
 const getEnvVar = (name: string): string => {
-  // 1. Priorité aux variables injectées par Vercel/Node
-  try {
-    if (typeof process !== 'undefined' && process.env && process.env[name]) {
-      return process.env[name] as string;
-    }
-  } catch (e) {}
+  // 1. Check LocalStorage first (Emergency config)
+  const localName = name.replace('VITE_', 'MJA_').replace('NEXT_PUBLIC_', 'MJA_');
+  const localValue = localStorage.getItem(localName);
+  if (localValue) return localValue;
 
-  // 2. Repli sur Vite (import.meta.env)
+  // 2. Check for Vite prefix (Standard)
+  const viteName = name.startsWith('VITE_') ? name : `VITE_${name.replace('NEXT_PUBLIC_', '')}`;
   try {
-    // @ts-ignore - On évite d'utiliser le mot-clé 'import' seul pour ne pas casser le build
     const metaEnv = (import.meta as any).env;
-    if (metaEnv && metaEnv[name]) {
-      return metaEnv[name] as string;
+    if (metaEnv && metaEnv[viteName]) return metaEnv[viteName];
+  } catch (e) {}
+
+  // 3. Check for Next prefix (Legacy fallback)
+  const nextName = name.startsWith('NEXT_PUBLIC_') ? name : `NEXT_PUBLIC_${name.replace('VITE_', '')}`;
+  try {
+    const metaEnv = (import.meta as any).env;
+    if (metaEnv && metaEnv[nextName]) return metaEnv[nextName];
+  } catch (e) {}
+
+  // 4. Check process.env (Vercel Node environment)
+  try {
+    if (typeof process !== 'undefined' && process.env) {
+      if (process.env[viteName]) return process.env[viteName] as string;
+      if (process.env[nextName]) return process.env[nextName] as string;
+      if (process.env[name]) return process.env[name] as string;
     }
   } catch (e) {}
 
-  // 3. Repli sur le localStorage (Config manuelle via Documentation)
-  const localName = name.replace('NEXT_PUBLIC_', 'MJA_');
-  return localStorage.getItem(localName) || "";
+  return "";
 };
 
-const SUPABASE_URL = getEnvVar('NEXT_PUBLIC_SUPABASE_URL');
-const SUPABASE_KEY = getEnvVar('NEXT_PUBLIC_SUPABASE_ANON_KEY');
+let SUPABASE_URL = getEnvVar('VITE_SUPABASE_URL');
+let SUPABASE_KEY = getEnvVar('VITE_SUPABASE_ANON_KEY');
 
 let supabaseInstance: SupabaseClient | null = null;
 
@@ -40,32 +54,30 @@ export const isSupabaseConfigured = (): boolean => {
 export const initSupabase = (forceReinit: boolean = false): SupabaseClient | null => {
   if (supabaseInstance && !forceReinit) return supabaseInstance;
   
-  if (!SUPABASE_URL || !SUPABASE_KEY) {
-    const url = localStorage.getItem('MJA_SUPABASE_URL');
-    const key = localStorage.getItem('MJA_SUPABASE_ANON_KEY');
-    if (!url || !key) return null;
-    supabaseInstance = createClient(url, key);
-  } else {
-    try {
-      supabaseInstance = createClient(SUPABASE_URL, SUPABASE_KEY, {
-        auth: { persistSession: false }
-      });
-    } catch (e) {
-      console.error("Supabase Init Error:", e);
-      return null;
-    }
+  SUPABASE_URL = getEnvVar('VITE_SUPABASE_URL');
+  SUPABASE_KEY = getEnvVar('VITE_SUPABASE_ANON_KEY');
+
+  if (!SUPABASE_URL || !SUPABASE_KEY) return null;
+
+  try {
+    supabaseInstance = createClient(SUPABASE_URL, SUPABASE_KEY, {
+      auth: { persistSession: false }
+    });
+    return supabaseInstance;
+  } catch (e) {
+    console.error("Supabase Client Init Error:", e);
+    return null;
   }
-  return supabaseInstance;
 };
 
 export const saveSupabaseConfig = (url: string, key: string) => {
-  localStorage.setItem('MJA_SUPABASE_URL', url);
-  localStorage.setItem('MJA_SUPABASE_ANON_KEY', key);
-  initSupabase(true); 
+  localStorage.setItem('MJA_SUPABASE_URL', url.trim());
+  localStorage.setItem('MJA_SUPABASE_ANON_KEY', key.trim());
+  initSupabase(true);
 };
 
 export const checkConnection = async (): Promise<boolean> => {
-  const client = initSupabase();
+  const client = initSupabase(true);
   if (!client) return false;
   try {
     const { error } = await client.from('classes').select('id').limit(1);
