@@ -2,19 +2,28 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Session, Student, ClassLevel, Progress, Message, Instructor } from '../types';
 
-// Fonction de récupération exhaustive des clés (Vercel / Process / Local)
+// Fonction de récupération sécurisée des clés (Vercel / Vite / Local)
 const getEnvVar = (name: string): string => {
-  // 1. Essai via process.env (Vercel / Node)
-  if (typeof process !== 'undefined' && process.env && process.env[name]) {
-    return process.env[name] as string;
-  }
-  // 2. Essai via import.meta.env (Vite)
-  // @ts-ignore
-  if (typeof import !== 'undefined' && import.meta && import.meta.env && import.meta.env[name]) {
+  try {
+    // 1. Essai via process.env (Vercel / Node)
     // @ts-ignore
-    return import.meta.env[name] as string;
-  }
-  // 3. Essai via localStorage (Configuration manuelle)
+    if (typeof process !== 'undefined' && process.env && process.env[name]) {
+      // @ts-ignore
+      return process.env[name] as string;
+    }
+  } catch (e) {}
+
+  try {
+    // 2. Essai via import.meta.env (Vite)
+    // On accède directement à import.meta.env sans typeof sur 'import'
+    // @ts-ignore
+    if (import.meta.env && import.meta.env[name]) {
+      // @ts-ignore
+      return import.meta.env[name] as string;
+    }
+  } catch (e) {}
+
+  // 3. Essai via localStorage (Configuration manuelle de secours)
   const localName = name.replace('NEXT_PUBLIC_', 'MJA_');
   return localStorage.getItem(localName) || "";
 };
@@ -32,8 +41,7 @@ export const initSupabase = (forceReinit: boolean = false): SupabaseClient | nul
   if (supabaseInstance && !forceReinit) return supabaseInstance;
   
   if (!SUPABASE_URL || !SUPABASE_KEY) {
-    console.warn("Supabase Config Missing. Using local storage fallback.");
-    // Tentative de secours ultime sur le localstorage si les env vars sont vides
+    console.warn("Supabase Config Missing in Env. Checking local storage fallback.");
     const url = localStorage.getItem('MJA_SUPABASE_URL');
     const key = localStorage.getItem('MJA_SUPABASE_ANON_KEY');
     if (!url || !key) return null;
