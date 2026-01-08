@@ -46,7 +46,7 @@ const Documentation: React.FC<DocumentationProps> = ({ club, students, classes, 
 
     if (!confirm("Voulez-vous envoyer TOUTES les données (élèves, sessions, classes) vers le Cloud ? Attention : cela écrasera les données cloud existantes.")) return;
 
-    setSyncLoading(true);
+    syncLoading(true);
     try {
       await db.syncClasses(classes);
       await db.syncInstructors(instructors);
@@ -160,7 +160,7 @@ CREATE TABLE IF NOT EXISTS messages (
                    <p className="text-[10px] font-black uppercase tracking-widest text-blue-200">Procédure Vercel :</p>
                    <ol className="text-xs space-y-3 font-bold">
                       <li>1. Allez sur votre dashboard Vercel</li>
-                      <li>2. Settings > Environment Variables</li>
+                      <li>2. Settings {' > '} Environment Variables</li>
                       <li>3. Ajoutez <code className="bg-white/20 px-2 py-0.5 rounded">NEXT_PUBLIC_SUPABASE_URL</code> avec votre URL</li>
                       <li>4. Ajoutez <code className="bg-white/20 px-2 py-0.5 rounded">NEXT_PUBLIC_SUPABASE_ANON_KEY</code> avec votre Clé Anon</li>
                       <li>5. Redéployez votre application</li>
