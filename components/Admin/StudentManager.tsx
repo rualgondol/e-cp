@@ -19,21 +19,17 @@ const StudentManager: React.FC<StudentManagerProps> = ({ club, students, setStud
   
   const [isAdding, setIsAdding] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
-  const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
   
   const classStudents = useMemo(() => students.filter(s => s.classId === selectedClassId), [students, selectedClassId]);
   const selectedStudent = useMemo(() => students.find(s => s.id === selectedStudentId), [students, selectedStudentId]);
 
-  // Calculer les élèves ayant des messages non lus
   const studentsWithUnread = useMemo(() => {
     return new Set(messages.filter(m => m.receiverId === 'admin' && !m.isRead).map(m => m.senderId));
   }, [messages]);
 
   const renderClassIcon = (icon: string | undefined, className: string = "w-4 h-4 rounded") => {
     if (!icon) return '❓';
-    if (icon.length > 5) {
-      return <img src={icon} className={className} alt="Icone classe" />;
-    }
+    if (icon.length > 5) return <img src={icon} className={className} alt="Icone" />;
     return <span>{icon}</span>;
   };
 
@@ -53,14 +49,6 @@ const StudentManager: React.FC<StudentManagerProps> = ({ club, students, setStud
     }
   };
 
-  const calculateAgeAndClass = (birthDate: string) => {
-    const birthYear = new Date(birthDate).getFullYear();
-    const currentYear = new Date().getFullYear();
-    const age = currentYear - birthYear;
-    const targetClass = classes.find(c => c.age === age && c.club === club);
-    return { age, classId: targetClass?.id || selectedClassId };
-  };
-
   const [newStudentData, setNewStudentData] = useState<Partial<Student>>({
     fullName: '', birthDate: '', address: '', motherName: '', fatherName: '',
     emergencyContacts: [{ name: '', phone: '', relationship: '' }, { name: '', phone: '', relationship: '' }],
@@ -69,17 +57,20 @@ const StudentManager: React.FC<StudentManagerProps> = ({ club, students, setStud
 
   const handleAddSubmit = () => {
     if (!newStudentData.fullName || !newStudentData.birthDate) return;
-    const { age, classId } = calculateAgeAndClass(newStudentData.birthDate);
+    const birthYear = new Date(newStudentData.birthDate).getFullYear();
+    const age = new Date().getFullYear() - birthYear;
+    
     const student: Student = {
       id: Math.random().toString(36).substr(2, 9),
       fullName: newStudentData.fullName,
       birthDate: newStudentData.birthDate,
-      age, classId,
+      age,
+      classId: selectedClassId,
       photo: newStudentData.photo,
       address: newStudentData.address || '',
       motherName: newStudentData.motherName || '',
       fatherName: newStudentData.fatherName || '',
-      emergencyContacts: newStudentData.emergencyContacts as EmergencyContact[] || [{ name: '', phone: '', relationship: '' }, { name: '', phone: '', relationship: '' }],
+      emergencyContacts: newStudentData.emergencyContacts as EmergencyContact[] || [],
       diseases: newStudentData.diseases || [],
       allergies: newStudentData.allergies || [],
       medications: newStudentData.medications || [],
@@ -88,26 +79,24 @@ const StudentManager: React.FC<StudentManagerProps> = ({ club, students, setStud
     };
     setStudents(prev => [...prev, student]);
     setIsAdding(false);
+    setNewStudentData({ fullName: '', birthDate: '', address: '', motherName: '', fatherName: '', emergencyContacts: [{ name: '', phone: '', relationship: '' }, { name: '', phone: '', relationship: '' }], diseases: [], allergies: [], medications: [] });
   };
 
   const handleEditSubmit = () => {
     if (!editingStudent) return;
-    const { age, classId } = calculateAgeAndClass(editingStudent.birthDate);
-    const updatedStudent: Student = {
-      ...editingStudent,
-      age,
-      classId
-    };
-    setStudents(prev => prev.map(s => s.id === updatedStudent.id ? updatedStudent : s));
+    const birthYear = new Date(editingStudent.birthDate).getFullYear();
+    const age = new Date().getFullYear() - birthYear;
+    const updated = { ...editingStudent, age };
+    setStudents(prev => prev.map(s => s.id === updated.id ? updated : s));
     setEditingStudent(null);
   };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:h-[calc(100vh-220px)] overflow-hidden">
-      {/* Sidebar: Liste des élèves */}
-      <div className="lg:col-span-4 flex flex-col bg-white rounded-2xl md:rounded-3xl shadow-lg border border-gray-200 overflow-hidden h-[500px] lg:h-auto">
+      {/* Sidebar */}
+      <div className="lg:col-span-4 flex flex-col bg-white rounded-3xl shadow-lg border border-gray-200 overflow-hidden h-[500px] lg:h-auto">
         <div className="p-4 bg-gray-50 border-b">
-          <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Sélecteur de Classe</label>
+          <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Classe</label>
           <div className="flex flex-wrap gap-2">
             {filteredClasses.map(cls => (
               <button 
@@ -120,188 +109,202 @@ const StudentManager: React.FC<StudentManagerProps> = ({ club, students, setStud
             ))}
           </div>
         </div>
-
-        <div className="p-4 border-b flex justify-between items-center bg-white sticky top-0 z-10">
+        <div className="p-4 border-b flex justify-between items-center">
           <h3 className="font-black text-gray-800 text-[10px] uppercase tracking-widest">Élèves ({classStudents.length})</h3>
-          <button onClick={() => setIsAdding(true)} className="bg-green-600 text-white text-[9px] font-black px-3 py-1.5 rounded-xl hover:bg-green-700 transition shadow-lg">+ INSCRIRE</button>
+          <button onClick={() => setIsAdding(true)} className="bg-green-600 text-white text-[9px] font-black px-3 py-1.5 rounded-xl shadow-lg hover:bg-green-700">+ INSCRIRE</button>
         </div>
-
         <div className="flex-1 overflow-y-auto custom-scrollbar">
-          <div className="divide-y divide-gray-100">
-            {classStudents.map(s => (
-              <div 
-                key={s.id} 
-                onClick={() => {
-                   setSelectedStudentId(s.id);
-                   if (window.innerWidth < 1024) {
-                      document.getElementById('profile-view')?.scrollIntoView({ behavior: 'smooth' });
-                   }
-                }}
-                className={`p-3 cursor-pointer transition-all flex justify-between items-center group border-l-4 ${selectedStudentId === s.id ? 'bg-blue-50/50 border-blue-600' : 'hover:bg-gray-50 border-transparent'}`}
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="relative">
-                    {s.photo ? (
-                      <img src={s.photo} className="w-8 h-8 rounded-full object-cover border-2 border-white shadow-sm" alt="" />
-                    ) : (
-                      <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center font-black text-[9px] text-gray-400">
-                        {s.fullName.split(' ').map(n => n[0]).join('')}
-                      </div>
-                    )}
-                    {studentsWithUnread.has(s.id) && (
-                      <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 border-2 border-white rounded-full animate-pulse"></span>
-                    )}
-                  </div>
-                  <div className="truncate pr-2">
-                    <p className={`font-bold text-[12px] flex items-center gap-2 ${selectedStudentId === s.id ? 'text-blue-900' : 'text-gray-800'}`}>
-                      {s.fullName}
-                      {studentsWithUnread.has(s.id) && <span className="text-[10px] animate-bounce">💬</span>}
-                    </p>
-                    <p className="text-[8px] text-gray-400 font-bold uppercase">{s.age} ans</p>
-                  </div>
+          {classStudents.map(s => (
+            <div 
+              key={s.id} 
+              onClick={() => setSelectedStudentId(s.id)}
+              className={`p-3 cursor-pointer transition-all flex justify-between items-center border-l-4 ${selectedStudentId === s.id ? 'bg-blue-50/50 border-blue-600' : 'hover:bg-gray-50 border-transparent'}`}
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="relative">
+                  {s.photo ? <img src={s.photo} className="w-8 h-8 rounded-full object-cover border-2 border-white shadow-sm" alt="" /> : <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center font-black text-[9px] text-gray-400">{s.fullName.split(' ').map(n => n[0]).join('')}</div>}
+                  {studentsWithUnread.has(s.id) && <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 border-2 border-white rounded-full animate-pulse"></span>}
                 </div>
-                <div className="flex items-center gap-1.5 opacity-60 group-hover:opacity-100">
-                  <button onClick={(e) => { e.stopPropagation(); setEditingStudent(s); }} className="p-1.5 bg-gray-100 rounded-lg hover:bg-blue-100 text-blue-600 transition text-xs">✏️</button>
-                  <button onClick={(e) => { e.stopPropagation(); setStudentToDelete(s); }} className="p-1.5 bg-gray-100 rounded-lg hover:bg-red-100 text-red-600 transition text-xs">🗑️</button>
+                <div className="truncate">
+                  <p className="font-bold text-[12px] text-gray-800">{s.fullName}</p>
+                  <p className="text-[8px] text-gray-400 font-bold uppercase">{s.age} ans</p>
                 </div>
               </div>
-            ))}
-          </div>
+              <button onClick={(e) => { e.stopPropagation(); setEditingStudent(s); }} className="p-1.5 bg-gray-100 rounded-lg hover:bg-blue-100 text-blue-600 transition text-xs">✏️</button>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* Main Column: Carte de profil complète */}
-      <div id="profile-view" className="lg:col-span-8 overflow-y-auto custom-scrollbar bg-white rounded-2xl md:rounded-3xl shadow-lg border border-gray-200">
+      {/* Profile View */}
+      <div className="lg:col-span-8 overflow-y-auto custom-scrollbar bg-white rounded-3xl shadow-lg border border-gray-200">
         {selectedStudent ? (
-          <div className="p-6 md:p-10 space-y-8 animate-fade-in">
-            {/* Header Profil */}
-            <div className="flex flex-col md:flex-row gap-6 items-center md:items-start border-b pb-8 border-gray-100">
-              <div className="relative">
-                <div className="w-24 h-24 md:w-32 md:h-32 rounded-2xl md:rounded-3xl bg-gray-50 border-4 border-white shadow-xl overflow-hidden">
-                  {selectedStudent.photo ? (
-                    <img src={selectedStudent.photo} className="w-full h-full object-cover" alt="" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-5xl opacity-20">👤</div>
-                  )}
-                </div>
+          <div className="p-6 md:p-10 space-y-10 animate-fade-in">
+            <div className="flex flex-col md:flex-row gap-8 items-center md:items-start border-b pb-10 border-gray-100">
+              <div className="w-32 h-32 rounded-3xl bg-gray-50 border-4 border-white shadow-xl overflow-hidden flex-shrink-0">
+                {selectedStudent.photo ? <img src={selectedStudent.photo} className="w-full h-full object-cover" alt="" /> : <div className="w-full h-full flex items-center justify-center text-5xl opacity-20">👤</div>}
               </div>
-              
               <div className="flex-1 text-center md:text-left">
-                <h2 className="text-2xl md:text-4xl font-black text-gray-900 tracking-tighter mb-2">{selectedStudent.fullName}</h2>
-                <div className="flex flex-wrap justify-center md:justify-start gap-4 text-xs">
+                <h2 className="text-3xl md:text-5xl font-black text-gray-900 tracking-tighter mb-2">{selectedStudent.fullName}</h2>
+                <div className="flex flex-wrap justify-center md:justify-start gap-6">
                   <div className="flex flex-col">
-                    <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Né(e) le</span>
-                    <span className="font-bold text-gray-800">{new Date(selectedStudent.birthDate).toLocaleDateString()} ({selectedStudent.age} ans)</span>
+                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Naissance</span>
+                    <span className="font-bold text-gray-800 text-sm">{new Date(selectedStudent.birthDate).toLocaleDateString()}</span>
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Classe</span>
-                    <span className="font-bold text-blue-600 uppercase flex items-center gap-1">
-                      {renderClassIcon(classes.find(c => c.id === selectedStudent.classId)?.icon)}
-                      {classes.find(c => c.id === selectedStudent.classId)?.name}
-                    </span>
+                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Adresse</span>
+                    <span className="font-bold text-gray-800 text-sm">{selectedStudent.address || "Non renseignée"}</span>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="space-y-6">
-                <section className="space-y-3">
-                  <h4 className="font-black text-[9px] text-gray-400 uppercase tracking-widest">👨‍👩‍👦 Parents</h4>
-                  <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 space-y-2">
-                    <div className="flex justify-between items-center bg-white p-2.5 rounded-xl border border-gray-100">
-                      <span className="text-[9px] font-bold text-gray-400 uppercase">Mère</span>
-                      <span className="font-black text-gray-800 text-xs">{selectedStudent.motherName || "—"}</span>
-                    </div>
-                    <div className="flex justify-between items-center bg-white p-2.5 rounded-xl border border-gray-100">
-                      <span className="text-[9px] font-bold text-gray-400 uppercase">Père</span>
-                      <span className="font-black text-gray-800 text-xs">{selectedStudent.fatherName || "—"}</span>
-                    </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+              <div className="space-y-8">
+                <section>
+                  <h4 className="font-black text-[10px] text-gray-400 uppercase tracking-widest mb-4">👨‍👩‍👦 Parents</h4>
+                  <div className="space-y-3">
+                    <div className="bg-gray-50 p-3 rounded-2xl border flex justify-between items-center"><span className="text-[9px] font-bold text-gray-400 uppercase">Mère</span><span className="font-black text-gray-800 text-xs">{selectedStudent.motherName || "—"}</span></div>
+                    <div className="bg-gray-50 p-3 rounded-2xl border flex justify-between items-center"><span className="text-[9px] font-bold text-gray-400 uppercase">Père</span><span className="font-black text-gray-800 text-xs">{selectedStudent.fatherName || "—"}</span></div>
                   </div>
                 </section>
-
-                <section className="space-y-3">
-                  <h4 className="font-black text-[9px] text-red-600 uppercase tracking-widest">🚨 Urgence</h4>
-                  {selectedStudent.emergencyContacts?.map((contact, idx) => (
-                    <div key={idx} className="bg-red-50/50 p-3 rounded-xl border border-red-100 flex justify-between items-center">
-                      <div className="min-w-0 pr-2">
-                        <p className="text-[8px] font-black text-red-400 uppercase">{contact.relationship || `Contact ${idx + 1}`}</p>
-                        <p className="font-black text-gray-900 text-xs truncate">{contact.name || "N/A"}</p>
-                      </div>
-                      <a href={`tel:${contact.phone}`} className="bg-white px-3 py-1.5 rounded-lg border border-red-100 text-red-600 shadow-sm text-xs font-black">
-                        {contact.phone || "--"}
-                      </a>
+                <section>
+                  <h4 className="font-black text-[10px] text-red-600 uppercase tracking-widest mb-4">🚨 Urgence</h4>
+                  {selectedStudent.emergencyContacts.map((c, i) => (
+                    <div key={i} className="bg-red-50/50 p-4 rounded-2xl border border-red-100 flex justify-between items-center mb-3">
+                      <div><p className="text-[8px] font-black text-red-400 uppercase">{c.relationship}</p><p className="font-black text-gray-900 text-xs">{c.name}</p></div>
+                      <a href={`tel:${c.phone}`} className="bg-white px-3 py-1.5 rounded-xl border border-red-100 text-red-600 font-black text-[10px]">{c.phone}</a>
                     </div>
                   ))}
                 </section>
               </div>
-
               <div className="space-y-6">
-                <h4 className="font-black text-[9px] text-red-500 uppercase tracking-widest">🚑 Alertes Médicales</h4>
-                <div className="space-y-3">
+                <h4 className="font-black text-[10px] text-red-500 uppercase tracking-widest mb-4">🚑 Alertes Médicales</h4>
+                <div className="space-y-4">
                   <div className="bg-red-50 p-4 rounded-2xl border border-red-100">
                     <p className="text-[8px] font-black text-red-400 uppercase mb-2">Maladies</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {selectedStudent.diseases.length > 0 ? selectedStudent.diseases.map((d, i) => (
-                        <span key={i} className="bg-white text-red-600 px-2 py-0.5 rounded-md text-[10px] font-black border border-red-100">{d}</span>
-                      )) : <p className="text-[10px] text-red-300 italic">Aucune</p>}
-                    </div>
+                    <div className="flex flex-wrap gap-1.5">{selectedStudent.diseases.length > 0 ? selectedStudent.diseases.map((d, i) => <span key={i} className="bg-white text-red-600 px-2 py-0.5 rounded-lg text-[10px] font-black border border-red-100">{d}</span>) : <p className="text-[10px] text-red-300 italic">Aucune</p>}</div>
                   </div>
                   <div className="bg-orange-50 p-4 rounded-2xl border border-orange-100">
                     <p className="text-[8px] font-black text-orange-400 uppercase mb-2">Allergies</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {selectedStudent.allergies.length > 0 ? selectedStudent.allergies.map((a, i) => (
-                        <span key={i} className="bg-white text-orange-600 px-2 py-0.5 rounded-md text-[10px] font-black border border-orange-100">{a}</span>
-                      )) : <p className="text-[10px] text-orange-300 italic">Aucune</p>}
-                    </div>
+                    <div className="flex flex-wrap gap-1.5">{selectedStudent.allergies.length > 0 ? selectedStudent.allergies.map((a, i) => <span key={i} className="bg-white text-orange-600 px-2 py-0.5 rounded-lg text-[10px] font-black border border-orange-100">{a}</span>) : <p className="text-[10px] text-orange-300 italic">Aucune</p>}</div>
+                  </div>
+                  <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100">
+                    <p className="text-[8px] font-black text-blue-400 uppercase mb-2">Médicaments</p>
+                    <div className="flex flex-wrap gap-1.5">{selectedStudent.medications.length > 0 ? selectedStudent.medications.map((m, i) => <span key={i} className="bg-white text-blue-600 px-2 py-0.5 rounded-lg text-[10px] font-black border border-blue-100">{m}</span>) : <p className="text-[10px] text-blue-300 italic">Aucun</p>}</div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-        ) : (
-          <div className="h-full flex flex-col items-center justify-center text-gray-300 p-10 text-center">
-            <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center text-3xl mb-4 shadow-inner">👤</div>
-            <p className="text-xs font-medium opacity-60">Sélectionnez un élève pour voir sa fiche</p>
-          </div>
-        )}
+        ) : <div className="h-full flex flex-col items-center justify-center text-gray-300 p-10 text-center"><div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center text-3xl mb-4">👤</div><p className="text-xs font-medium opacity-60">Sélectionnez un élève</p></div>}
       </div>
 
-      {/* MODALE Ajout / Edition */}
+      {/* MODALE CRUD COMPLETE */}
       {(isAdding || editingStudent) && (
-        <div className="fixed inset-0 bg-blue-900/60 flex items-center justify-center p-2 md:p-4 z-[200] backdrop-blur-sm">
-          <div className="bg-white rounded-3xl w-full max-w-4xl max-h-[95vh] flex flex-col shadow-2xl animate-scale-in">
-            <div className="p-6 border-b flex justify-between items-center sticky top-0 bg-white z-10 rounded-t-3xl">
-              <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight">{isAdding ? "Inscription" : "Modification"}</h2>
-              <button onClick={() => { setIsAdding(false); setEditingStudent(null); }} className="text-gray-300 text-2xl">✕</button>
+        <div className="fixed inset-0 bg-blue-900/60 flex items-center justify-center p-4 z-[200] backdrop-blur-sm">
+          <div className="bg-white rounded-[2.5rem] w-full max-w-5xl max-h-[90vh] flex flex-col shadow-2xl animate-scale-in overflow-hidden">
+            <div className="p-8 border-b flex justify-between items-center bg-gray-50/50">
+              <h2 className="text-2xl font-black text-gray-900 uppercase tracking-tight">{isAdding ? "Nouvelle Inscription" : "Mise à jour Dossier"}</h2>
+              <button onClick={() => { setIsAdding(false); setEditingStudent(null); }} className="text-gray-300 text-3xl hover:text-red-500">✕</button>
             </div>
-            <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {/* Inputs identification */}
-                <div className="space-y-4">
-                  <label className="text-[9px] font-black uppercase text-blue-600 tracking-widest border-b pb-1 block">1. Identité</label>
-                  <div className="flex items-center gap-3">
-                    <div className="w-16 h-16 rounded-xl bg-gray-100 relative group overflow-hidden flex-shrink-0">
-                       {(editingStudent?.photo || newStudentData.photo) ? (
-                         <img src={editingStudent?.photo || newStudentData.photo} className="w-full h-full object-cover" alt="" />
-                       ) : <span className="absolute inset-0 flex items-center justify-center text-xl opacity-20">📸</span>}
-                       <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handlePhotoUpload(e, !!editingStudent)} />
+            
+            <div className="flex-1 overflow-y-auto p-8 space-y-10 custom-scrollbar">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+                {/* 1. IDENTITE */}
+                <div className="space-y-6">
+                  <label className="text-[10px] font-black uppercase text-blue-600 tracking-widest border-b pb-2 block">1. Identification</label>
+                  <div className="flex items-center gap-4">
+                    <div className="w-20 h-20 rounded-2xl bg-gray-100 relative group overflow-hidden flex-shrink-0 border-2 border-dashed border-gray-200">
+                      {(editingStudent?.photo || newStudentData.photo) && <img src={editingStudent?.photo || newStudentData.photo} className="w-full h-full object-cover" alt="" />}
+                      <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handlePhotoUpload(e, !!editingStudent)} />
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><span className="text-white text-xs font-black">PHOTO</span></div>
                     </div>
                     <input 
                       type="text" placeholder="Nom Complet"
                       value={editingStudent ? editingStudent.fullName : newStudentData.fullName}
                       onChange={e => editingStudent ? setEditingStudent({...editingStudent, fullName: e.target.value}) : setNewStudentData({...newStudentData, fullName: e.target.value})}
-                      className="flex-1 border-2 border-gray-100 p-2.5 rounded-xl font-bold text-sm outline-none focus:border-blue-400"
+                      className="flex-1 border-2 border-gray-100 p-3 rounded-2xl font-bold text-sm outline-none focus:border-blue-400"
                     />
                   </div>
-                  <input type="date" value={editingStudent ? editingStudent.birthDate : newStudentData.birthDate} onChange={e => editingStudent ? setEditingStudent({...editingStudent, birthDate: e.target.value}) : setNewStudentData({...newStudentData, birthDate: e.target.value})} className="w-full border-2 border-gray-100 p-2.5 rounded-xl text-sm" />
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Date de naissance</label>
+                    <input type="date" value={editingStudent ? editingStudent.birthDate : newStudentData.birthDate} onChange={e => editingStudent ? setEditingStudent({...editingStudent, birthDate: e.target.value}) : setNewStudentData({...newStudentData, birthDate: e.target.value})} className="w-full border-2 border-gray-100 p-3 rounded-2xl text-sm font-bold" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Adresse postale</label>
+                    <textarea value={editingStudent ? editingStudent.address : newStudentData.address} onChange={e => editingStudent ? setEditingStudent({...editingStudent, address: e.target.value}) : setNewStudentData({...newStudentData, address: e.target.value})} className="w-full border-2 border-gray-100 p-3 rounded-2xl text-sm font-bold h-20" placeholder="Ex: 123 Rue du Club..." />
+                  </div>
                 </div>
-                {/* Emergency & medical sections go here with similar responsive styling... */}
+
+                {/* 2. FAMILLE ET URGENCE */}
+                <div className="space-y-6">
+                  <label className="text-[10px] font-black uppercase text-orange-600 tracking-widest border-b pb-2 block">2. Parents & Urgence</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <input type="text" placeholder="Nom Mère" value={editingStudent ? editingStudent.motherName : newStudentData.motherName} onChange={e => editingStudent ? setEditingStudent({...editingStudent, motherName: e.target.value}) : setNewStudentData({...newStudentData, motherName: e.target.value})} className="border-2 border-gray-100 p-3 rounded-2xl text-xs font-bold" />
+                    <input type="text" placeholder="Nom Père" value={editingStudent ? editingStudent.fatherName : newStudentData.fatherName} onChange={e => editingStudent ? setEditingStudent({...editingStudent, fatherName: e.target.value}) : setNewStudentData({...newStudentData, fatherName: e.target.value})} className="border-2 border-gray-100 p-3 rounded-2xl text-xs font-bold" />
+                  </div>
+                  {[0, 1].map(i => (
+                    <div key={i} className="p-4 bg-gray-50 rounded-2xl space-y-3">
+                      <p className="text-[8px] font-black text-gray-400 uppercase">Contact d'urgence {i+1}</p>
+                      <input type="text" placeholder="Nom" value={editingStudent ? editingStudent.emergencyContacts[i]?.name : newStudentData.emergencyContacts?.[i]?.name} onChange={e => {
+                        const contacts = [...(editingStudent ? editingStudent.emergencyContacts : newStudentData.emergencyContacts!)];
+                        contacts[i] = { ...contacts[i], name: e.target.value };
+                        editingStudent ? setEditingStudent({...editingStudent, emergencyContacts: contacts}) : setNewStudentData({...newStudentData, emergencyContacts: contacts});
+                      }} className="w-full p-2 text-xs rounded-xl border border-gray-200" />
+                      <div className="grid grid-cols-2 gap-2">
+                        <input type="text" placeholder="Relation" value={editingStudent ? editingStudent.emergencyContacts[i]?.relationship : newStudentData.emergencyContacts?.[i]?.relationship} onChange={e => {
+                          const contacts = [...(editingStudent ? editingStudent.emergencyContacts : newStudentData.emergencyContacts!)];
+                          contacts[i] = { ...contacts[i], relationship: e.target.value };
+                          editingStudent ? setEditingStudent({...editingStudent, emergencyContacts: contacts}) : setNewStudentData({...newStudentData, emergencyContacts: contacts});
+                        }} className="p-2 text-xs rounded-xl border border-gray-200" />
+                        <input type="text" placeholder="Téléphone" value={editingStudent ? editingStudent.emergencyContacts[i]?.phone : newStudentData.emergencyContacts?.[i]?.phone} onChange={e => {
+                          const contacts = [...(editingStudent ? editingStudent.emergencyContacts : newStudentData.emergencyContacts!)];
+                          contacts[i] = { ...contacts[i], phone: e.target.value };
+                          editingStudent ? setEditingStudent({...editingStudent, emergencyContacts: contacts}) : setNewStudentData({...newStudentData, emergencyContacts: contacts});
+                        }} className="p-2 text-xs rounded-xl border border-gray-200" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* 3. MEDICAL */}
+                <div className="space-y-6">
+                  <label className="text-[10px] font-black uppercase text-red-600 tracking-widest border-b pb-2 block">3. Santé (Séparer par ,)</label>
+                  <div className="space-y-4">
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black text-red-400 uppercase ml-1">Maladies</label>
+                      <input type="text" placeholder="Ex: Asthme, Diabète..." value={editingStudent ? editingStudent.diseases.join(', ') : newStudentData.diseases?.join(', ')} onChange={e => {
+                        const list = e.target.value.split(',').map(s => s.trim()).filter(s => s !== "");
+                        editingStudent ? setEditingStudent({...editingStudent, diseases: list}) : setNewStudentData({...newStudentData, diseases: list});
+                      }} className="w-full border-2 border-red-50 p-3 rounded-2xl text-xs font-bold" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black text-orange-400 uppercase ml-1">Allergies</label>
+                      <input type="text" placeholder="Ex: Arachides, Pénicilline..." value={editingStudent ? editingStudent.allergies.join(', ') : newStudentData.allergies?.join(', ')} onChange={e => {
+                        const list = e.target.value.split(',').map(s => s.trim()).filter(s => s !== "");
+                        editingStudent ? setEditingStudent({...editingStudent, allergies: list}) : setNewStudentData({...newStudentData, allergies: list});
+                      }} className="w-full border-2 border-orange-50 p-3 rounded-2xl text-xs font-bold" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black text-blue-400 uppercase ml-1">Médicaments</label>
+                      <input type="text" placeholder="Ex: Ventoline, Insuline..." value={editingStudent ? editingStudent.medications.join(', ') : newStudentData.medications?.join(', ')} onChange={e => {
+                        const list = e.target.value.split(',').map(s => s.trim()).filter(s => s !== "");
+                        editingStudent ? setEditingStudent({...editingStudent, medications: list}) : setNewStudentData({...newStudentData, medications: list});
+                      }} className="w-full border-2 border-blue-50 p-3 rounded-2xl text-xs font-bold" />
+                    </div>
+                  </div>
+                  <div className="mt-8 p-4 bg-yellow-50 rounded-2xl border border-yellow-100">
+                    <p className="text-[8px] font-black text-yellow-600 uppercase mb-1">Sécurité</p>
+                    <p className="text-[10px] text-yellow-700 font-bold leading-tight">Vérifiez bien ces informations avant d'enregistrer. Elles sont vitales en cas d'incident.</p>
+                  </div>
+                </div>
               </div>
             </div>
-            <div className="p-6 border-t flex justify-end gap-3 bg-gray-50/50 rounded-b-3xl">
-              <button onClick={() => { setIsAdding(false); setEditingStudent(null); }} className="px-4 py-2 text-gray-400 font-bold uppercase text-[10px]">Annuler</button>
-              <button onClick={editingStudent ? handleEditSubmit : handleAddSubmit} className="bg-blue-600 text-white px-8 py-3 rounded-xl font-black text-xs uppercase shadow-xl hover:bg-blue-700 transition">Enregistrer</button>
+
+            <div className="p-8 border-t flex justify-end gap-4 bg-gray-50/80">
+              <button onClick={() => { setIsAdding(false); setEditingStudent(null); }} className="px-6 py-2 text-gray-400 font-black uppercase text-[10px] tracking-widest">Annuler</button>
+              <button onClick={editingStudent ? handleEditSubmit : handleAddSubmit} className="bg-blue-600 text-white px-10 py-4 rounded-2xl font-black text-xs uppercase shadow-2xl hover:bg-blue-700 transition-all transform active:scale-95">Enregistrer le dossier</button>
             </div>
           </div>
         </div>
