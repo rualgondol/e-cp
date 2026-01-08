@@ -8,10 +8,14 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
-    <!-- Quill.js Editor Styles and Scripts (v2.0 for Table support) -->
-    <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet" />
-    <script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
-    
+    <!-- Editor.js Core and Tools -->
+    <script src="https://cdn.jsdelivr.net/npm/@editorjs/editorjs@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@editorjs/header@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@editorjs/list@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@editorjs/table@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@editorjs/image@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@editorjs/paragraph@latest"></script>
+
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -19,55 +23,18 @@
         }
         .bottle-green { background-color: #004225; }
         .royal-blue { background-color: #002366; }
-        .bordeaux { background-color: #800020; }
         .gold { background-color: #D4AF37; }
 
-        /* Quill Editor Customizations */
-        .quill-wrapper {
+        /* Editor.js Customizations */
+        .editorjs-wrapper {
             background-color: white;
-            border-radius: 0.75rem;
-            overflow: hidden;
+            border-radius: 1.5rem;
+            padding: 2rem;
             border: 2px solid #f1f5f9;
+            min-height: 400px;
         }
-        .ql-toolbar.ql-snow {
-            border: none !important;
-            border-bottom: 2px solid #f1f5f9 !important;
-            background-color: #f8fafc;
-            padding: 0.75rem !important;
-        }
-        .ql-container.ql-snow {
-            border: none !important;
-            min-height: 450px;
-            font-size: 1rem;
-        }
-        .ql-editor {
-            color: #1a202c !important; 
-            line-height: 1.6;
-        }
-        
-        /* Table Styles for Quill 2.0 */
-        .ql-editor table {
-            border-collapse: collapse;
-            width: 100%;
-            margin-bottom: 1rem;
-        }
-        .ql-editor td {
-            border: 1px solid #e2e8f0;
-            padding: 10px;
-        }
-        
-        .ql-editor img, .ql-editor video {
-            max-width: 100%;
-            height: auto;
-            border-radius: 0.5rem;
-            display: block;
-            margin: 1rem auto;
-        }
-        .ql-video {
-            width: 100%;
-            aspect-ratio: 16 / 9;
-            border-radius: 0.75rem;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        .ce-block__content, .ce-toolbar__content {
+            max-width: 100% !important;
         }
 
         .global-footer {
