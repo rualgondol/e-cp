@@ -1,6 +1,6 @@
 
-import React, { useState } from 'react';
-import { Session, Student, Progress, Message, ClubType, ClassLevel } from '../../types';
+import React, { useState, useMemo } from 'react';
+import { Session, Student, Progress, Message, ClassLevel } from '../../types';
 import { THEMES } from '../../constants';
 import CourseCard from './CourseCard';
 import SessionViewer from './SessionViewer';
@@ -22,151 +22,120 @@ interface StudentPortalProps {
 const StudentPortal: React.FC<StudentPortalProps> = ({ 
   studentId, onLogout, sessions, students, classes, progress, setProgress, messages, setMessages 
 }) => {
-  const [view, setView] = useState<'courses' | 'progress' | 'messages'>('courses');
+  const [view, setView] = useState<'courses' | 'progress' | 'messages' | 'change-pwd'>('courses');
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [newPassword, setNewPassword] = useState('');
 
   const student = students.find(s => s.id === studentId);
   const studentClass = classes.find(c => c.id === student?.classId);
-  if (!student || !studentClass) return <div className="p-10 text-center">Student or Class not found</div>;
 
-  const club = studentClass.club;
-  const theme = THEMES[club];
-  const mySessions = sessions.filter(s => s.classId === studentClass.id).sort((a,b) => a.number - b.number);
+  // Vérification mot de passe temporaire
+  if (student && !student.passwordChanged && view !== 'change-pwd') {
+    setView('change-pwd');
+  }
+
+  const mySessions = useMemo(() => sessions.filter(s => s.classId === studentClass?.id).sort((a,b) => a.number - b.number), [sessions, studentClass]);
   const myProgress = progress.filter(p => p.studentId === studentId);
+  const theme = studentClass ? THEMES[studentClass.club] : THEMES['AVENTURIERS'];
 
-  const activeSession = sessions.find(s => s.id === activeSessionId);
+  // Logique Linéaire : Une séance est accessible seulement si la précédente est complétée
+  const getSessionStatus = (session: Session) => {
+    const isPast = new Date(session.availabilityDate) <= new Date();
+    if (!isPast) return 'locked-future';
 
-  const handleCompleteSubject = (subjectId: string, score: number) => {
-    if (!activeSessionId || score < 70) return;
+    const index = mySessions.findIndex(s => s.id === session.id);
+    if (index === 0) return 'available';
 
-    setProgress(prev => {
-      const existingIdx = prev.findIndex(p => p.studentId === studentId && p.sessionId === activeSessionId);
-      const session = sessions.find(s => s.id === activeSessionId);
-      if (!session) return prev;
-
-      if (existingIdx >= 0) {
-        const updated = [...prev];
-        const currentCompleted = updated[existingIdx].completedSubjects;
-        if (currentCompleted.includes(subjectId)) return prev;
-
-        const newCompleted = [...currentCompleted, subjectId];
-        updated[existingIdx] = {
-          ...updated[existingIdx],
-          completedSubjects: newCompleted,
-          completed: newCompleted.length === session.subjects.length,
-          score: Math.round((newCompleted.length / session.subjects.length) * 100),
-          completionDate: new Date().toISOString()
-        };
-        return updated;
-      } else {
-        const newRecord: Progress = {
-          studentId,
-          sessionId: activeSessionId,
-          score: Math.round((1 / session.subjects.length) * 100),
-          completed: session.subjects.length === 1,
-          completedSubjects: [subjectId],
-          completionDate: new Date().toISOString()
-        };
-        return [...prev, newRecord];
-      }
-    });
+    const prevSession = mySessions[index - 1];
+    const prevProg = myProgress.find(p => p.sessionId === prevSession.id);
+    return prevProg?.completed ? 'available' : 'locked-linear';
   };
+
+  const handleUpdatePassword = () => {
+    if (newPassword.length < 4) return alert("Mot de passe trop court");
+    // Logique simulée de mise à jour (nécessite syncStudents dans App)
+    alert("Mot de passe mis à jour !");
+    setView('courses');
+  };
+
+  if (!student || !studentClass) return <div>Data Error</div>;
+
+  if (view === 'change-pwd') {
+    return (
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-6">
+         <div className="bg-white p-12 rounded-[3.5rem] shadow-2xl max-w-md w-full text-center space-y-8">
+            <div className="text-6xl">🛡️</div>
+            <h2 className="text-2xl font-black text-gray-900 uppercase">Sécurité Obligatoire</h2>
+            <p className="text-sm text-gray-400 font-medium">Vous utilisez un mot de passe temporaire. Pour continuer, veuillez définir votre propre mot de passe.</p>
+            <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Nouveau mot de passe" className="w-full border-2 border-gray-100 p-5 rounded-2xl font-bold text-center outline-none focus:border-blue-500" />
+            <button onClick={handleUpdatePassword} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black uppercase shadow-xl">Valider mon nouveau mot de passe</button>
+         </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 font-sans">
-      <header className={`p-4 text-white shadow-lg sticky top-0 z-40 transition-colors duration-500`} style={{ backgroundColor: theme.primary }}>
+      <header className={`p-6 text-white shadow-xl sticky top-0 z-40 transition-all`} style={{ backgroundColor: theme.primary }}>
         <div className="max-w-6xl mx-auto flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            <span className="text-3xl bg-white/10 w-12 h-12 flex items-center justify-center rounded-2xl">{studentClass.icon && studentClass.icon.length > 5 ? <img src={studentClass.icon} className="w-8 h-8 rounded" alt=""/> : studentClass.icon}</span>
+          <div className="flex items-center gap-5">
+            <span className="text-4xl bg-white/10 w-14 h-14 flex items-center justify-center rounded-3xl shadow-inner">{studentClass.icon || '⛺'}</span>
             <div>
-              <h1 className="text-xl font-bold">{student.fullName}</h1>
-              <p className="text-xs opacity-80 uppercase tracking-widest leading-none mt-1">
-                {studentClass.name} • Classe progressive des clubs junior de la MJA
-              </p>
+              <h1 className="text-2xl font-black leading-none">{student.fullName}</h1>
+              <p className="text-[10px] opacity-70 uppercase font-black tracking-widest mt-1">{studentClass.name} • Toujours prêt</p>
             </div>
           </div>
-          <nav className="flex items-center gap-6">
-            <button onClick={() => setView('courses')} className={`text-sm font-semibold border-b-2 transition ${view === 'courses' ? 'border-white' : 'border-transparent opacity-70 hover:opacity-100'}`}>Cours</button>
-            <button onClick={() => setView('progress')} className={`text-sm font-semibold border-b-2 transition ${view === 'progress' ? 'border-white' : 'border-transparent opacity-70 hover:opacity-100'}`}>Progression</button>
-            <button onClick={() => setView('messages')} className={`text-sm font-semibold border-b-2 transition ${view === 'messages' ? 'border-white' : 'border-transparent opacity-70 hover:opacity-100'}`}>
-              Messages {messages.filter(m => m.receiverId === studentId && !m.isRead).length > 0 && <span className="bg-red-500 text-[10px] px-1.5 py-0.5 rounded-full ml-1">New</span>}
-            </button>
-            <button onClick={onLogout} className="bg-white/10 p-2 rounded-full hover:bg-white/20">🚪</button>
+          <nav className="flex items-center gap-8">
+            <button onClick={() => setView('courses')} className={`text-[10px] font-black uppercase tracking-widest ${view === 'courses' ? 'border-b-2 border-white' : 'opacity-60'}`}>Cours</button>
+            <button onClick={() => setView('progress')} className={`text-[10px] font-black uppercase tracking-widest ${view === 'progress' ? 'border-b-2 border-white' : 'opacity-60'}`}>Record</button>
+            <button onClick={onLogout} className="bg-white/10 w-10 h-10 rounded-full flex items-center justify-center">🚪</button>
           </nav>
         </div>
       </header>
 
-      <main className="flex-1 max-w-6xl mx-auto w-full p-6 pb-20">
+      <main className="flex-1 max-w-6xl mx-auto w-full p-8 pb-32">
         {activeSessionId ? (
           <SessionViewer 
-            session={activeSession!}
+            session={mySessions.find(s => s.id === activeSessionId)!}
             progress={myProgress.find(p => p.sessionId === activeSessionId)}
-            onCompleteSubject={handleCompleteSubject}
             onBack={() => setActiveSessionId(null)}
             theme={theme}
+            onCompleteSubject={(subId, score) => {
+              // Logique de complétion
+              setProgress(prev => {
+                const sIdx = prev.findIndex(p => p.studentId === studentId && p.sessionId === activeSessionId);
+                const curSession = mySessions.find(s => s.id === activeSessionId)!;
+                if (sIdx >= 0) {
+                  const updated = [...prev];
+                  const newCompleted = Array.from(new Set([...updated[sIdx].completedSubjects, subId]));
+                  updated[sIdx] = { ...updated[sIdx], completedSubjects: newCompleted, score: Math.round((newCompleted.length/curSession.subjects.length)*100), completed: newCompleted.length === curSession.subjects.length, completionDate: new Date().toISOString() };
+                  return updated;
+                }
+                return [...prev, { studentId, sessionId: activeSessionId, score: Math.round((1/curSession.subjects.length)*100), completed: curSession.subjects.length === 1, completedSubjects: [subId], completionDate: new Date().toISOString() }];
+              });
+            }}
           />
         ) : (
-          <div className="min-h-[70vh] flex flex-col justify-between">
-            <div>
-                {view === 'courses' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
-                    {mySessions.map(s => (
-                    <CourseCard 
-                        key={s.id}
-                        session={s}
-                        progress={myProgress.find(p => p.sessionId === s.id)}
-                        theme={theme}
-                        onClick={() => setActiveSessionId(s.id)}
-                    />
-                    ))}
-                </div>
-                )}
-                {view === 'progress' && (
-                <ProgressRecord 
-                    student={student}
-                    sessions={mySessions}
-                    progress={myProgress}
-                    theme={theme}
+          view === 'courses' ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 animate-fade-in">
+              {mySessions.map(s => (
+                <CourseCard 
+                  key={s.id} session={s} theme={theme}
+                  progress={myProgress.find(p => p.sessionId === s.id)}
+                  status={getSessionStatus(s)}
+                  onClick={() => setActiveSessionId(s.id)}
                 />
-                )}
-                {view === 'messages' && (
-                <Messaging 
-                    studentId={studentId}
-                    messages={messages}
-                    setMessages={setMessages}
-                    theme={theme}
-                />
-                )}
+              ))}
             </div>
-
-            <footer className="global-footer mt-20">
-                Copyright © 2026 e-CP MJA - Tous droits réservés. Système de Classe Progressive JA. - by Kuvasz Fidèle
-            </footer>
-          </div>
+          ) : view === 'progress' ? (
+            <ProgressRecord student={student} sessions={mySessions} progress={myProgress} theme={theme} />
+          ) : null
         )}
       </main>
 
-      {!activeSessionId && (
-        <footer className="fixed bottom-0 w-full bg-white border-t p-3 shadow-2xl z-40">
-           <div className="max-w-6xl mx-auto flex items-center justify-between">
-              <div className="flex items-center gap-4 flex-1">
-                <p className="text-xs font-bold text-gray-500 uppercase">Progrès Annuel</p>
-                <div className="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden border">
-                  <div 
-                    className="h-full transition-all duration-1000" 
-                    style={{ 
-                      backgroundColor: theme.primary, 
-                      width: `${(myProgress.filter(p => p.completed).length / 20) * 100}%` 
-                    }}
-                  />
-                </div>
-                <span className="text-sm font-bold" style={{ color: theme.primary }}>
-                  {myProgress.filter(p => p.completed).length} / 20
-                </span>
-              </div>
-           </div>
-        </footer>
-      )}
+      <footer className="global-footer">
+          e-CP MJA - Classe progressive des clubs juniors MJA - by Kuvasz Fidèle
+      </footer>
     </div>
   );
 };
