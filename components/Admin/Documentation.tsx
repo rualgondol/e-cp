@@ -1,7 +1,6 @@
 
 import React, { useState } from 'react';
 import { ClubType, Student, ClassLevel, Session, Progress, Instructor } from '../../types';
-import { saveSupabaseConfig, db } from '../../services/supabaseService';
 
 interface DocumentationProps {
   club: ClubType;
@@ -11,131 +10,108 @@ interface DocumentationProps {
   progress: Progress[];
   instructors: Instructor[];
   dbStatus: 'loading' | 'connected' | 'error';
+  onManualSync: () => void;
 }
 
-const Documentation: React.FC<DocumentationProps> = ({ club, students, classes, sessions, progress, instructors, dbStatus }) => {
-  const [activeDocTab, setActiveDocTab] = useState<'system' | 'config' | 'deploy' | 'cheat'>('system');
-  
-  const [url, setUrl] = useState(localStorage.getItem('MJA_SUPABASE_URL') || '');
-  const [key, setKey] = useState(localStorage.getItem('MJA_SUPABASE_ANON_KEY') || '');
-  const [geminiKey, setGeminiKey] = useState(localStorage.getItem('MJA_GEMINI_API_KEY') || '');
-  const [saveMsg, setSaveMsg] = useState('');
-  const [syncLoading, setSyncLoading] = useState(false);
+const Documentation: React.FC<DocumentationProps> = ({ club, students, classes, sessions, progress, instructors, dbStatus, onManualSync }) => {
+  const [activeDocTab, setActiveDocTab] = useState<'system' | 'hosting' | 'cheat'>('system');
 
-  const handleSaveConfig = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (url && key) saveSupabaseConfig(url, key);
-    if (geminiKey) localStorage.setItem('MJA_GEMINI_API_KEY', geminiKey);
-
-    setSaveMsg('✅ Configuration locale mise à jour !');
-    setTimeout(() => {
-      setSaveMsg('');
-      if (url && key) window.location.reload();
-    }, 1500);
-  };
-
-  const handleFullSync = async () => {
-    if (dbStatus !== 'connected') {
-      alert("Veuillez d'abord connecter votre base de données Supabase.");
-      return;
-    }
-    if (!confirm("Voulez-vous migrer vos données vers le Cloud ?")) return;
-
-    setSyncLoading(true);
-    try {
-      await db.syncClasses(classes);
-      await db.syncInstructors(instructors);
-      await db.syncStudents(students);
-      await db.syncSessions(sessions);
-      await db.syncProgress(progress);
-      setSaveMsg('🚀 Migration Cloud réussie !');
-    } catch (err) {
-      alert("Erreur de migration.");
-    } finally {
-      setSyncLoading(false);
-      setTimeout(() => setSaveMsg(''), 3000);
-    }
-  };
+  const fullSqlScript = `
+-- STRUCTURE DE BASE e-CP MJA
+CREATE TABLE IF NOT EXISTS classes (id TEXT PRIMARY KEY, name TEXT NOT NULL, age INTEGER, club TEXT NOT NULL, icon TEXT);
+CREATE TABLE IF NOT EXISTS instructors (id TEXT PRIMARY KEY, "fullName" TEXT NOT NULL, username TEXT NOT NULL UNIQUE, password TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'AVENTURIERS');
+CREATE TABLE IF NOT EXISTS students (id TEXT PRIMARY KEY, "fullName" TEXT NOT NULL, "birthDate" DATE, age INTEGER, "classId" TEXT REFERENCES classes(id), photo TEXT, address TEXT, "motherName" TEXT, "fatherName" TEXT, "emergencyContacts" JSONB DEFAULT '[]', diseases TEXT[] DEFAULT '{}', allergies TEXT[] DEFAULT '{}', medications TEXT[] DEFAULT '{}', "passwordChanged" BOOLEAN DEFAULT false, "temporaryPassword" TEXT);
+CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY, club TEXT NOT NULL, "classId" TEXT REFERENCES classes(id), number INTEGER, subjects JSONB DEFAULT '[]', "availabilityDate" DATE);
+CREATE TABLE IF NOT EXISTS progress (id BIGSERIAL PRIMARY KEY, "studentId" TEXT REFERENCES students(id) ON DELETE CASCADE, "sessionId" TEXT REFERENCES sessions(id) ON DELETE CASCADE, score INTEGER, completed BOOLEAN DEFAULT false, "completedSubjects" TEXT[] DEFAULT '{}', "completionDate" TIMESTAMP WITH TIME ZONE DEFAULT NOW(), UNIQUE("studentId", "sessionId"));
+CREATE TABLE IF NOT EXISTS messages (id TEXT PRIMARY KEY, "senderId" TEXT NOT NULL, "receiverId" TEXT NOT NULL, content TEXT NOT NULL, timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(), "isRead" BOOLEAN DEFAULT false);
+`;
 
   return (
-    <div className="bg-white rounded-3xl shadow-xl border border-gray-200 overflow-hidden h-[calc(100vh-220px)] flex flex-col">
-      <div className="bg-gray-50 p-4 border-b flex gap-2 overflow-x-auto">
-        {[
-          { id: 'system', label: 'Architecture', icon: '🏛️' },
-          { id: 'config', label: 'Migration', icon: '💾' },
-          { id: 'deploy', label: 'Déploiement Vercel', icon: '🚀' },
-          { id: 'cheat', label: 'Sécurité', icon: '🛡️' },
-        ].map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveDocTab(tab.id as any)}
-            className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-2 flex-shrink-0 ${activeDocTab === tab.id ? 'bg-blue-600 text-white shadow-lg' : 'bg-white text-gray-500 border border-gray-100 hover:bg-gray-100'}`}
-          >
-            <span>{tab.icon}</span> {tab.label}
-          </button>
-        ))}
+    <div className="bg-white rounded-[3rem] shadow-xl border border-gray-100 overflow-hidden h-[calc(100vh-220px)] flex flex-col">
+      <div className="bg-gray-50/50 p-6 border-b flex justify-between items-center">
+        <div className="flex gap-4">
+          {['system', 'hosting', 'cheat'].map(t => (
+            <button key={t} onClick={() => setActiveDocTab(t as any)} className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${activeDocTab === t ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-400 hover:text-gray-900'}`}>
+              {t === 'system' ? 'Architecture' : t === 'hosting' ? 'Déploiement' : 'Aide-mémoire'}
+            </button>
+          ))}
+        </div>
+        <button onClick={onManualSync} className="bg-green-600 text-white px-6 py-2 rounded-xl text-[10px] font-black uppercase shadow-xl">🔄 Synchronisation Manuelle</button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-10 custom-scrollbar font-sans">
-        {activeDocTab === 'deploy' && (
-          <div className="max-w-3xl space-y-10 animate-fade-in">
-             <div className="bg-blue-600 p-8 rounded-[3rem] text-white shadow-2xl relative overflow-hidden">
-                <div className="absolute -right-20 -top-20 text-[15rem] opacity-10">🚀</div>
-                <h3 className="text-2xl font-black uppercase tracking-tighter mb-4">Connexion Permanente sur Vercel</h3>
-                <p className="text-blue-100 text-sm leading-relaxed mb-6 font-medium">
-                  Pour que vos élèves se connectent automatiquement, vous devez renommer vos variables avec le préfixe <strong>VITE_</strong> dans le tableau de bord Vercel.
-                </p>
-                <div className="bg-white/10 backdrop-blur-md p-6 rounded-2xl border border-white/20 space-y-4">
-                   <p className="text-[10px] font-black uppercase tracking-widest text-blue-200">Procédure Correcte :</p>
-                   <ol className="text-xs space-y-3 font-bold">
-                      <li>1. Allez sur Vercel.com et ouvrez votre projet.</li>
-                      <li>2. Allez dans <strong>Settings</strong> puis <strong>Environment Variables</strong>.</li>
-                      <li>3. Ajoutez <code className="bg-white/20 px-2 py-0.5 rounded">VITE_SUPABASE_URL</code> avec votre URL.</li>
-                      <li>4. Ajoutez <code className="bg-white/20 px-2 py-0.5 rounded">VITE_SUPABASE_ANON_KEY</code> avec votre Clé Anon.</li>
-                      <li>5. <strong>IMPORTANT :</strong> Relancez un déploiement pour appliquer les changements.</li>
-                   </ol>
+      <div className="flex-1 overflow-y-auto p-12 custom-scrollbar">
+        {activeDocTab === 'system' && (
+          <div className="max-w-4xl space-y-12 animate-fade-in">
+             <section className="space-y-4">
+                <h3 className="text-3xl font-black text-gray-900 tracking-tighter uppercase">Architecture & Technologies</h3>
+                <p className="text-gray-500 leading-relaxed font-medium">L'application est une Single Page Application (SPA) bâtie sur une architecture moderne Cloud-Native.</p>
+                <div className="grid grid-cols-2 gap-4">
+                   <div className="bg-gray-50 p-6 rounded-3xl border border-gray-100">
+                      <p className="text-[10px] font-black text-blue-600 uppercase mb-2">Frontend</p>
+                      <ul className="text-xs font-bold text-gray-700 space-y-1">
+                         <li>• React 19 (Hooks & Context)</li>
+                         <li>• Tailwind CSS (Design System)</li>
+                         <li>• Editor.js (Édition structurée)</li>
+                      </ul>
+                   </div>
+                   <div className="bg-gray-50 p-6 rounded-3xl border border-gray-100">
+                      <p className="text-[10px] font-black text-green-600 uppercase mb-2">Backend & IA</p>
+                      <ul className="text-xs font-bold text-gray-700 space-y-1">
+                         <li>• Supabase (DB PostgreSQL Realtime)</li>
+                         <li>• Gemini Pro (Génération de cours)</li>
+                         <li>• Vercel (Hébergement Serverless)</li>
+                      </ul>
+                   </div>
                 </div>
+             </section>
+
+             <section className="space-y-4">
+                <h4 className="text-xl font-black text-gray-800 uppercase">Script SQL (Tables)</h4>
+                <div className="bg-gray-900 p-6 rounded-3xl text-green-400 font-mono text-[9px] overflow-x-auto whitespace-pre-wrap">
+                   {fullSqlScript}
+                </div>
+             </section>
+          </div>
+        )}
+
+        {activeDocTab === 'cheat' && (
+          <div className="space-y-8 animate-fade-in">
+             <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tighter">Aide-mémoire Accès Jeunes</h3>
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {students.sort((a,b) => a.fullName.localeCompare(b.fullName)).map(s => (
+                  <div key={s.id} className="bg-gray-50 p-6 rounded-3xl border border-gray-100 flex justify-between items-center">
+                     <div>
+                        <p className="font-black text-gray-900 text-sm">{s.fullName}</p>
+                        <p className="text-[10px] text-gray-400 font-bold uppercase">{classes.find(c => c.id === s.classId)?.name}</p>
+                     </div>
+                     <div className="text-right">
+                        <p className="text-[9px] font-black text-gray-400 uppercase">MDP Temporaire</p>
+                        <p className="font-mono text-xs bg-white px-2 py-1 rounded-lg border">{s.temporaryPassword || "Modifié"}</p>
+                     </div>
+                  </div>
+                ))}
              </div>
           </div>
         )}
 
-        {activeDocTab === 'config' && (
-          <div className="max-w-xl space-y-8 animate-fade-in">
-            <h3 className="text-2xl font-black text-gray-800 tracking-tighter uppercase border-l-4 border-blue-600 pl-4">Configuration Manuelle</h3>
-            <form onSubmit={handleSaveConfig} className="space-y-8">
-              <div className="bg-gray-50 p-8 rounded-[2.5rem] border border-gray-200 space-y-6 shadow-inner">
-                 <h4 className="text-xs font-black text-gray-900 uppercase tracking-widest">⚙️ Configuration Locale</h4>
-                 <div>
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">URL du Projet</label>
-                    <input type="text" value={url} onChange={e => setUrl(e.target.value)} placeholder="https://..." className="w-full border-2 border-gray-100 p-4 rounded-2xl font-mono text-xs focus:border-blue-500 outline-none" />
-                 </div>
-                 <div>
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Clé API (anon)</label>
-                    <textarea value={key} onChange={e => setKey(e.target.value)} placeholder="eyJ..." className="w-full border-2 border-gray-100 p-4 rounded-2xl font-mono text-xs h-20 focus:border-blue-500 outline-none" />
-                 </div>
-                 <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black text-[10px] uppercase shadow-lg">Sauvegarder dans ce navigateur</button>
-              </div>
-              
-              {saveMsg && <p className="text-green-600 font-bold text-center text-xs">{saveMsg}</p>}
-
-              <div className="bg-amber-50 p-8 rounded-[2.5rem] border border-amber-100 space-y-4">
-                  <button type="button" onClick={handleFullSync} disabled={syncLoading || dbStatus !== 'connected'} className="w-full bg-amber-500 text-white py-5 rounded-2xl font-black text-[11px] uppercase shadow-xl disabled:opacity-30">
-                    {syncLoading ? '🚀 Synchronisation...' : '⬆️ Envoyer vers Supabase'}
-                  </button>
-               </div>
-            </form>
-          </div>
-        )}
-
-        {activeDocTab === 'system' && (
-          <div className="max-w-4xl space-y-8 animate-fade-in text-center py-10">
-            <div className="text-6xl mb-6">🌩️</div>
-            <h3 className="text-3xl font-black text-gray-800 tracking-tighter uppercase">Cloud Native</h3>
-            <p className="max-w-2xl mx-auto text-gray-500 font-medium leading-relaxed">
-               Le système e-CP MJA utilise Supabase pour stocker les données de 140 élèves. 
-               Une fois que vos variables <strong>VITE_</strong> sont configurées sur Vercel, 
-               tout le monde accède à la même base de données instantanément.
-            </p>
+        {activeDocTab === 'hosting' && (
+          <div className="max-w-2xl space-y-8 animate-fade-in">
+             <h3 className="text-2xl font-black text-gray-900 uppercase">Guide d'Hébergement</h3>
+             <div className="space-y-6">
+                <div className="bg-blue-50 p-8 rounded-[2.5rem] border border-blue-100 space-y-4">
+                   <p className="text-blue-900 font-bold text-sm">Hébergement Vercel (Gratuit) :</p>
+                   <ol className="text-xs text-blue-800 font-medium space-y-2">
+                      <li>1. Connectez votre compte GitHub à Vercel.</li>
+                      <li>2. Importez le dépôt du projet.</li>
+                      <li>3. Configurez les variables <code className="bg-white/50 px-1">VITE_SUPABASE_URL</code> et <code className="bg-white/50 px-1">VITE_SUPABASE_ANON_KEY</code>.</li>
+                      <li>4. Déployez.</li>
+                   </ol>
+                </div>
+                <div className="bg-orange-50 p-8 rounded-[2.5rem] border border-orange-100 space-y-4">
+                   <p className="text-orange-900 font-bold text-sm">Base de données Supabase :</p>
+                   <p className="text-xs text-orange-800 font-medium">Créez un projet Supabase gratuit, allez dans l'onglet SQL Editor, et collez le script fourni dans l'onglet Architecture pour initialiser les tables.</p>
+                </div>
+             </div>
           </div>
         )}
       </div>
