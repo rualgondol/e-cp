@@ -37,17 +37,24 @@ const Login: React.FC<LoginProps> = ({ onLogin, students, instructors, dbStatus,
     e.preventDefault();
     if (isLoading) return;
     
+    // Admin Check
     const instructor = instructors.find(ins => ins.username.toLowerCase() === username.toLowerCase() && ins.password === password);
     if (instructor) {
       onLogin('admin', instructor.id, instructor.role);
       return;
     }
 
-    const student = students.find(s => s.fullName.toLowerCase() === username.toLowerCase());
+    // Student Check
+    const student = students.find(s => {
+      const nameMatch = s.fullName.toLowerCase() === username.toLowerCase();
+      const pwdMatch = s.password === password || s.temporaryPassword === password;
+      return nameMatch && pwdMatch;
+    });
+
     if (student) {
       onLogin('student', student.id);
     } else {
-      setError('Identifiants incorrects');
+      setError('Identifiants ou mot de passe incorrects');
     }
   };
 
@@ -101,7 +108,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, students, instructors, dbStatus,
             </div>
 
             <form onSubmit={handleLogin} className="space-y-6">
-              <input type="text" value={username} onChange={e => setUsername(e.target.value)} className="w-full rounded-2xl border-2 border-gray-100 bg-gray-50 p-4 font-bold text-sm" placeholder="Nom du Jeune ou Instructeur" />
+              <input type="text" value={username} onChange={e => setUsername(e.target.value)} className="w-full rounded-2xl border-2 border-gray-100 bg-gray-50 p-4 font-bold text-sm" placeholder="Nom Complet du Jeune" />
               <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full rounded-2xl border-2 border-gray-100 bg-gray-50 p-4 font-bold text-sm" placeholder="Mot de passe" />
               {error && <p className="text-red-600 text-[10px] font-black text-center uppercase">{error}</p>}
               <button type="submit" className="w-full py-5 rounded-2xl text-[11px] font-black text-white uppercase tracking-[0.2em] bg-[#004225] shadow-xl">Se Connecter</button>
