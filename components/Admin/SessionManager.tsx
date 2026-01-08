@@ -5,52 +5,42 @@ import { generateSessionContent, generateQuizForSubject } from '../../services/g
 
 declare global {
   interface Window {
-    EditorJS: any;
-    Header: any;
-    List: any;
-    Table: any;
-    ImageTool: any;
+    Quill: any;
   }
 }
 
-const BlockEditor: React.FC<{ value: string; onChange: (data: string) => void; id: string }> = ({ value, onChange, id }) => {
-  const editorRef = useRef<any>(null);
-  const containerId = `editorjs-${id}`;
+const QuillEditor: React.FC<{ value: string; onChange: (content: string) => void; id: string }> = ({ value, onChange, id }) => {
+  const editorRef = useRef<HTMLDivElement>(null);
+  const quillInstance = useRef<any>(null);
 
   useEffect(() => {
-    if (!editorRef.current && window.EditorJS) {
-      let initialData = { blocks: [] };
-      try {
-        if (value && value.startsWith('{')) {
-          initialData = JSON.parse(value);
-        } else if (value) {
-          initialData = { blocks: [{ type: 'paragraph', data: { text: value } }] };
-        }
-      } catch (e) {
-        console.error("EditorJS parse error", e);
-      }
-
-      const editor = new window.EditorJS({
-        holder: containerId,
-        tools: {
-          header: window.Header,
-          list: window.List,
-          table: window.Table,
+    if (editorRef.current && !quillInstance.current) {
+      quillInstance.current = new window.Quill(editorRef.current, {
+        theme: 'snow',
+        modules: {
+          toolbar: [
+            [{ 'header': [1, 2, 3, false] }],
+            ['bold', 'italic', 'underline', 'strike'],
+            [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+            ['link', 'image', 'clean']
+          ]
         },
-        data: initialData,
-        onChange: async () => {
-          const savedData = await editor.save();
-          onChange(JSON.stringify(savedData));
-        },
-        placeholder: 'Cliquez ici pour commencer à écrire le cours par blocs...'
+        placeholder: 'Rédigez le contenu du cours ici...'
       });
-      editorRef.current = editor;
+
+      quillInstance.current.on('text-change', () => {
+        onChange(quillInstance.current.root.innerHTML);
+      });
     }
-  }, []);
+    
+    if (quillInstance.current && value !== quillInstance.current.root.innerHTML) {
+        quillInstance.current.root.innerHTML = value || '';
+    }
+  }, [value, onChange]);
 
   return (
-    <div className="editorjs-wrapper shadow-inner border border-gray-100 mt-2">
-      <div id={containerId}></div>
+    <div className="bg-white rounded-2xl overflow-hidden border border-gray-100 mt-2">
+      <div ref={editorRef} style={{ height: '300px' }} />
     </div>
   );
 };
@@ -97,8 +87,7 @@ const SessionManager: React.FC<SessionManagerProps> = ({ club, sessions, setSess
     setLoadingStates(prev => ({ ...prev, [`${idx}-content`]: 'content' }));
     const generated = await generateSessionContent(`Matière`, sub.name, sub.prerequisite);
     const subjects = [...(editingSession!.subjects!)];
-    const editorData = { blocks: [{ type: 'paragraph', data: { text: generated } }] };
-    subjects[idx] = { ...subjects[idx], content: JSON.stringify(editorData) };
+    subjects[idx] = { ...subjects[idx], content: generated };
     setEditingSession({ ...editingSession, subjects });
     setLoadingStates(prev => ({ ...prev, [`${idx}-content`]: null }));
   };
@@ -117,9 +106,18 @@ const SessionManager: React.FC<SessionManagerProps> = ({ club, sessions, setSess
   return (
     <div className="space-y-6 pb-20 font-sans">
       <div className="flex justify-between items-center bg-white p-6 rounded-3xl shadow-sm">
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {classes.filter(c => c.club === club).map(cls => (
-            <button key={cls.id} onClick={() => setSelectedClass(cls.id)} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase border transition-all ${selectedClass === cls.id ? 'bg-blue-600 text-white shadow-lg' : 'bg-white'}`}>
+            <button 
+                key={cls.id} 
+                onClick={() => setSelectedClass(cls.id)} 
+                className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase border transition-all flex items-center gap-2 ${selectedClass === cls.id ? 'bg-blue-600 text-white shadow-lg border-blue-600' : 'bg-white hover:bg-gray-50'}`}
+            >
+              <span className="w-5 h-5 flex items-center justify-center overflow-hidden rounded-md">
+                {cls.icon && cls.icon.length > 5 ? (
+                    <img src={cls.icon} className="w-full h-full object-cover" alt="" />
+                ) : cls.icon || '⛺'}
+              </span>
               {cls.name}
             </button>
           ))}
@@ -132,12 +130,15 @@ const SessionManager: React.FC<SessionManagerProps> = ({ club, sessions, setSess
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {sessions.filter(s => s.classId === selectedClass).map(session => (
           <div key={session.id} onClick={() => setEditingSession(session)} className="bg-white rounded-[2rem] shadow-md p-8 border-b-8 border-yellow-500 cursor-pointer hover:shadow-2xl transition transform hover:-translate-y-2">
-            <h3 className="text-2xl font-black text-gray-900 mb-4">Semaine {session.number}</h3>
+            <h3 className="text-2xl font-black text-gray-900 mb-4 tracking-tighter uppercase">Semaine {session.number}</h3>
             <div className="space-y-3">
               {session.subjects.map((sub, i) => (
-                <div key={i} className="flex justify-between items-center bg-gray-50 p-3 rounded-2xl border border-gray-100">
-                  <span className="text-xs font-bold text-gray-600">{sub.name}</span>
-                  {sub.quiz && sub.quiz.length > 0 && <span className="text-[8px] bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full font-black">QUIZ OK</span>}
+                <div key={i} className="bg-gray-50/50 p-4 rounded-2xl border border-gray-100 space-y-1">
+                  <div className="flex justify-between items-start">
+                    <span className="text-xs font-black text-gray-800 leading-tight flex-1">{sub.name}</span>
+                    {sub.quiz && sub.quiz.length > 0 && <span className="text-[8px] bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full font-black">QUIZ</span>}
+                  </div>
+                  <p className="text-[9px] text-gray-400 font-bold italic line-clamp-1">Pre-requis: {sub.prerequisite}</p>
                 </div>
               ))}
             </div>
@@ -159,7 +160,6 @@ const SessionManager: React.FC<SessionManagerProps> = ({ club, sessions, setSess
                   <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Date de libération</p>
                   <input type="date" value={editingSession.availabilityDate} onChange={e => setEditingSession({...editingSession, availabilityDate: e.target.value})} className="bg-transparent font-black text-blue-900 outline-none" />
                 </div>
-                <p className="text-[10px] font-bold text-blue-400 italic">La séance sera visible par les élèves à cette date.</p>
               </div>
 
               {editingSession.subjects?.map((sub, idx) => (
@@ -179,7 +179,7 @@ const SessionManager: React.FC<SessionManagerProps> = ({ club, sessions, setSess
                   
                   <div className="flex justify-between items-center mb-2">
                     <div className="flex gap-4">
-                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Contenu (Editor.js)</p>
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Contenu (Quill)</p>
                       <button onClick={() => handleAiContent(idx)} disabled={!!loadingStates[`${idx}-content`]} className="text-[9px] bg-indigo-50 text-indigo-600 font-black px-4 py-2 rounded-xl border border-indigo-100 hover:bg-indigo-100 transition">
                         {loadingStates[`${idx}-content`] ? 'Génération...' : '✨ Générer Cours'}
                       </button>
@@ -189,9 +189,9 @@ const SessionManager: React.FC<SessionManagerProps> = ({ club, sessions, setSess
                     </button>
                   </div>
 
-                  <BlockEditor id={`${sub.id}-${idx}`} value={sub.content} onChange={(val) => {
+                  <QuillEditor id={`sub-${idx}`} value={sub.content} onChange={(content) => {
                     const subjects = [...editingSession.subjects!];
-                    subjects[idx].content = val;
+                    subjects[idx].content = content;
                     setEditingSession({...editingSession, subjects});
                   }} />
                 </div>
