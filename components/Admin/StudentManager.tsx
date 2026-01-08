@@ -24,6 +24,11 @@ const StudentManager: React.FC<StudentManagerProps> = ({ club, students, setStud
   const classStudents = useMemo(() => students.filter(s => s.classId === selectedClassId), [students, selectedClassId]);
   const selectedStudent = useMemo(() => students.find(s => s.id === selectedStudentId), [students, selectedStudentId]);
 
+  // Calculer les élèves ayant des messages non lus
+  const studentsWithUnread = useMemo(() => {
+    return new Set(messages.filter(m => m.receiverId === 'admin' && !m.isRead).map(m => m.senderId));
+  }, [messages]);
+
   const renderClassIcon = (icon: string | undefined, className: string = "w-4 h-4 rounded") => {
     if (!icon) return '❓';
     if (icon.length > 5) {
@@ -85,7 +90,6 @@ const StudentManager: React.FC<StudentManagerProps> = ({ club, students, setStud
     setIsAdding(false);
   };
 
-  // Fix: Added handleEditSubmit to handle updates for existing students
   const handleEditSubmit = () => {
     if (!editingStudent) return;
     const { age, classId } = calculateAgeAndClass(editingStudent.birthDate);
@@ -136,15 +140,23 @@ const StudentManager: React.FC<StudentManagerProps> = ({ club, students, setStud
                 className={`p-3 cursor-pointer transition-all flex justify-between items-center group border-l-4 ${selectedStudentId === s.id ? 'bg-blue-50/50 border-blue-600' : 'hover:bg-gray-50 border-transparent'}`}
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  {s.photo ? (
-                    <img src={s.photo} className="w-8 h-8 rounded-full object-cover border-2 border-white shadow-sm" alt="" />
-                  ) : (
-                    <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center font-black text-[9px] text-gray-400">
-                      {s.fullName.split(' ').map(n => n[0]).join('')}
-                    </div>
-                  )}
+                  <div className="relative">
+                    {s.photo ? (
+                      <img src={s.photo} className="w-8 h-8 rounded-full object-cover border-2 border-white shadow-sm" alt="" />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center font-black text-[9px] text-gray-400">
+                        {s.fullName.split(' ').map(n => n[0]).join('')}
+                      </div>
+                    )}
+                    {studentsWithUnread.has(s.id) && (
+                      <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 border-2 border-white rounded-full animate-pulse"></span>
+                    )}
+                  </div>
                   <div className="truncate pr-2">
-                    <p className={`font-bold text-[12px] ${selectedStudentId === s.id ? 'text-blue-900' : 'text-gray-800'}`}>{s.fullName}</p>
+                    <p className={`font-bold text-[12px] flex items-center gap-2 ${selectedStudentId === s.id ? 'text-blue-900' : 'text-gray-800'}`}>
+                      {s.fullName}
+                      {studentsWithUnread.has(s.id) && <span className="text-[10px] animate-bounce">💬</span>}
+                    </p>
                     <p className="text-[8px] text-gray-400 font-bold uppercase">{s.age} ans</p>
                   </div>
                 </div>
