@@ -182,6 +182,7 @@ const App: React.FC = () => {
           setProgress={updateProgress}
           messages={messages}
           setMessages={setMessages}
+          dbStatus={dbStatus}
         />
       )}
     </div>
