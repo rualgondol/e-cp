@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { ClubType, Session, Subject, ClassLevel } from '../../types';
-import { generateSessionContent, generateQuizForSubject } from '../../services/geminiService';
+import { generateQuizForSubject } from '../../services/geminiService';
 
 declare global {
   interface Window {
@@ -19,8 +19,8 @@ const QuillEditor: React.FC<{ value: string; onChange: (content: string) => void
         theme: 'snow',
         modules: {
           toolbar: [
-            [{ 'header': [1, 2, 3, false] }],
-            ['bold', 'italic', 'underline', 'strike'],
+            [{ 'header': [1, 2, false] }],
+            ['bold', 'italic', 'underline'],
             [{ 'list': 'ordered'}, { 'list': 'bullet' }],
             ['link', 'image', 'clean']
           ]
@@ -39,8 +39,8 @@ const QuillEditor: React.FC<{ value: string; onChange: (content: string) => void
   }, [value, onChange]);
 
   return (
-    <div className="bg-white rounded-2xl overflow-hidden border border-gray-100 mt-2">
-      <div ref={editorRef} style={{ height: '300px' }} />
+    <div className="bg-white rounded-xl overflow-hidden border border-gray-200 mt-1 shadow-sm">
+      <div ref={editorRef} style={{ height: '200px' }} />
     </div>
   );
 };
@@ -55,7 +55,7 @@ interface SessionManagerProps {
 const SessionManager: React.FC<SessionManagerProps> = ({ club, sessions, setSessions, classes }) => {
   const [editingSession, setEditingSession] = useState<Partial<Session> | null>(null);
   const [selectedClass, setSelectedClass] = useState<string>(classes.find(c => c.club === club)?.id || '');
-  const [loadingStates, setLoadingStates] = useState<Record<string, 'content' | 'quiz' | null>>({});
+  const [loadingStates, setLoadingStates] = useState<Record<string, 'quiz' | null>>({});
 
   const handleSave = () => {
     if (!editingSession) return;
@@ -81,20 +81,15 @@ const SessionManager: React.FC<SessionManagerProps> = ({ club, sessions, setSess
     setEditingSession({ ...editingSession, subjects });
   };
 
-  const handleAiContent = async (idx: number) => {
-    const sub = editingSession?.subjects?.[idx];
-    if (!sub?.name) return;
-    setLoadingStates(prev => ({ ...prev, [`${idx}-content`]: 'content' }));
-    const generated = await generateSessionContent(`Matière`, sub.name, sub.prerequisite);
-    const subjects = [...(editingSession!.subjects!)];
-    subjects[idx] = { ...subjects[idx], content: generated };
+  const removeSubject = (idx: number) => {
+    const subjects = [...(editingSession?.subjects || [])];
+    subjects.splice(idx, 1);
     setEditingSession({ ...editingSession, subjects });
-    setLoadingStates(prev => ({ ...prev, [`${idx}-content`]: null }));
   };
 
   const handleAiQuiz = async (idx: number) => {
     const sub = editingSession?.subjects?.[idx];
-    if (!sub?.name || !sub?.content) return alert("Veuillez d'abord générer ou écrire le contenu du cours.");
+    if (!sub?.name || !sub?.content) return alert("Veuillez d'abord écrire le contenu du cours pour générer un quiz.");
     setLoadingStates(prev => ({ ...prev, [`${idx}-quiz`]: 'quiz' }));
     const generatedQuiz = await generateQuizForSubject(sub.name, sub.content);
     const subjects = [...(editingSession!.subjects!)];
@@ -105,15 +100,15 @@ const SessionManager: React.FC<SessionManagerProps> = ({ club, sessions, setSess
 
   return (
     <div className="space-y-6 pb-20 font-sans">
-      <div className="flex justify-between items-center bg-white p-6 rounded-3xl shadow-sm">
+      <div className="flex justify-between items-center bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
         <div className="flex flex-wrap gap-2">
           {classes.filter(c => c.club === club).map(cls => (
             <button 
                 key={cls.id} 
                 onClick={() => setSelectedClass(cls.id)} 
-                className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase border transition-all flex items-center gap-2 ${selectedClass === cls.id ? 'bg-blue-600 text-white shadow-lg border-blue-600' : 'bg-white hover:bg-gray-50'}`}
+                className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase border transition-all flex items-center gap-2 ${selectedClass === cls.id ? 'bg-blue-600 text-white shadow-md border-blue-600' : 'bg-white hover:bg-gray-50 border-gray-200 text-gray-500'}`}
             >
-              <span className="w-5 h-5 flex items-center justify-center overflow-hidden rounded-md">
+              <span className="w-4 h-4 flex items-center justify-center overflow-hidden rounded">
                 {cls.icon && cls.icon.length > 5 ? (
                     <img src={cls.icon} className="w-full h-full object-cover" alt="" />
                 ) : cls.icon || '⛺'}
@@ -122,23 +117,26 @@ const SessionManager: React.FC<SessionManagerProps> = ({ club, sessions, setSess
             </button>
           ))}
         </div>
-        <button onClick={() => setEditingSession({ classId: selectedClass, subjects: [], availabilityDate: new Date().toISOString().split('T')[0] })} className="bg-green-600 text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase shadow-xl hover:bg-green-700 transition">
+        <button onClick={() => setEditingSession({ classId: selectedClass, subjects: [], availabilityDate: new Date().toISOString().split('T')[0] })} className="bg-green-600 text-white px-5 py-2.5 rounded-xl font-black text-[10px] uppercase shadow-lg hover:bg-green-700 transition">
           + Nouvelle Semaine
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         {sessions.filter(s => s.classId === selectedClass).map(session => (
-          <div key={session.id} onClick={() => setEditingSession(session)} className="bg-white rounded-[2rem] shadow-md p-8 border-b-8 border-yellow-500 cursor-pointer hover:shadow-2xl transition transform hover:-translate-y-2">
-            <h3 className="text-2xl font-black text-gray-900 mb-4 tracking-tighter uppercase">Semaine {session.number}</h3>
-            <div className="space-y-3">
+          <div key={session.id} onClick={() => setEditingSession(session)} className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200 cursor-pointer hover:shadow-xl transition transform hover:-translate-y-1">
+            <div className="flex justify-between items-center mb-4 pb-2 border-b border-gray-50">
+               <h3 className="text-lg font-black text-gray-900 tracking-tight uppercase">Semaine {session.number}</h3>
+               <span className="text-[8px] font-bold text-gray-400">{new Date(session.availabilityDate).toLocaleDateString()}</span>
+            </div>
+            <div className="space-y-2">
               {session.subjects.map((sub, i) => (
-                <div key={i} className="bg-gray-50/50 p-4 rounded-2xl border border-gray-100 space-y-1">
+                <div key={i} className="bg-gray-50 p-3 rounded-xl border border-gray-100 space-y-0.5">
                   <div className="flex justify-between items-start">
-                    <span className="text-xs font-black text-gray-800 leading-tight flex-1">{sub.name}</span>
-                    {sub.quiz && sub.quiz.length > 0 && <span className="text-[8px] bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full font-black">QUIZ</span>}
+                    <span className="text-[11px] font-black text-gray-800 leading-tight flex-1">{sub.name}</span>
+                    {sub.quiz && sub.quiz.length > 0 && <span className="text-[7px] bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded font-black ml-2 uppercase">Quiz</span>}
                   </div>
-                  <p className="text-[9px] text-gray-400 font-bold italic line-clamp-1">Pre-requis: {sub.prerequisite}</p>
+                  <p className="text-[8px] text-gray-400 font-bold italic line-clamp-1">{sub.prerequisite}</p>
                 </div>
               ))}
             </div>
@@ -147,60 +145,83 @@ const SessionManager: React.FC<SessionManagerProps> = ({ club, sessions, setSess
       </div>
 
       {editingSession && (
-        <div className="fixed inset-0 bg-blue-900/60 backdrop-blur-md flex items-center justify-center p-4 z-[150]">
-          <div className="bg-white rounded-[3rem] w-full max-w-5xl h-[90vh] overflow-hidden flex flex-col shadow-2xl animate-scale-in">
-            <div className="p-10 border-b flex justify-between items-center bg-gray-50/50">
-              <h2 className="text-3xl font-black text-gray-900 uppercase">Semaine {editingSession.number || "Nouveau"}</h2>
-              <button onClick={() => setEditingSession(null)} className="text-gray-300 hover:text-red-500 text-3xl font-light">✕</button>
+        <div className="fixed inset-0 bg-blue-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-[150]">
+          <div className="bg-white rounded-[2rem] w-full max-w-4xl h-[85vh] overflow-hidden flex flex-col shadow-2xl animate-scale-in border border-white/20">
+            <div className="p-6 border-b flex justify-between items-center bg-gray-50/80">
+              <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight">Configuration Semaine {editingSession.number || ""}</h2>
+              <button onClick={() => setEditingSession(null)} className="text-gray-400 hover:text-red-500 text-xl font-light p-2">✕</button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-10 space-y-10 custom-scrollbar">
-              <div className="bg-blue-50 p-6 rounded-3xl border border-blue-100 mb-6 flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Date de libération</p>
-                  <input type="date" value={editingSession.availabilityDate} onChange={e => setEditingSession({...editingSession, availabilityDate: e.target.value})} className="bg-transparent font-black text-blue-900 outline-none" />
+            <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar bg-slate-50/30">
+              <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Date de libération :</label>
+                  <input type="date" value={editingSession.availabilityDate} onChange={e => setEditingSession({...editingSession, availabilityDate: e.target.value})} className="bg-gray-50 border border-gray-200 rounded-lg p-2 text-xs font-black text-gray-900 outline-none" />
                 </div>
+                <p className="text-[9px] text-gray-400 font-bold italic">La séance s'affichera pour les élèves à cette date.</p>
               </div>
 
               {editingSession.subjects?.map((sub, idx) => (
-                <div key={sub.id} className="bg-white border-2 border-gray-100 rounded-[2.5rem] p-8 space-y-8 relative">
-                  <div className="grid grid-cols-2 gap-8">
-                    <input type="text" placeholder="Nom de la matière" value={sub.name} onChange={e => {
-                      const subjects = [...editingSession.subjects!];
-                      subjects[idx].name = e.target.value;
-                      setEditingSession({...editingSession, subjects});
-                    }} className="w-full bg-gray-50 text-xl font-black p-5 rounded-2xl border-2 border-gray-100 outline-none focus:border-blue-400" />
-                    <input type="text" placeholder="Pre-requis" value={sub.prerequisite} onChange={e => {
-                      const subjects = [...editingSession.subjects!];
-                      subjects[idx].prerequisite = e.target.value;
-                      setEditingSession({...editingSession, subjects});
-                    }} className="w-full bg-gray-50 font-bold p-5 rounded-2xl border-2 border-gray-100 outline-none focus:border-blue-400" />
+                <div key={sub.id} className="bg-white border border-gray-200 rounded-2xl p-5 space-y-4 shadow-sm relative group">
+                  <button onClick={() => removeSubject(idx)} className="absolute top-4 right-4 text-gray-300 hover:text-red-500 transition-colors">🗑️</button>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Nom de la matière</label>
+                      <input type="text" placeholder="Ex: La Création" value={sub.name} onChange={e => {
+                        const subjects = [...editingSession.subjects!];
+                        subjects[idx].name = e.target.value;
+                        setEditingSession({...editingSession, subjects});
+                      }} className="w-full bg-gray-50 text-sm font-black p-3 rounded-xl border border-gray-200 outline-none focus:border-blue-300 transition-all" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Pré-requis</label>
+                      <input type="text" placeholder="Objectif à atteindre..." value={sub.prerequisite} onChange={e => {
+                        const subjects = [...editingSession.subjects!];
+                        subjects[idx].prerequisite = e.target.value;
+                        setEditingSession({...editingSession, subjects});
+                      }} className="w-full bg-gray-50 font-bold p-3 rounded-xl border border-gray-200 text-xs outline-none focus:border-blue-300 transition-all" />
+                    </div>
                   </div>
                   
-                  <div className="flex justify-between items-center mb-2">
-                    <div className="flex gap-4">
-                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Contenu (Quill)</p>
-                      <button onClick={() => handleAiContent(idx)} disabled={!!loadingStates[`${idx}-content`]} className="text-[9px] bg-indigo-50 text-indigo-600 font-black px-4 py-2 rounded-xl border border-indigo-100 hover:bg-indigo-100 transition">
-                        {loadingStates[`${idx}-content`] ? 'Génération...' : '✨ Générer Cours'}
-                      </button>
-                    </div>
-                    <button onClick={() => handleAiQuiz(idx)} disabled={!!loadingStates[`${idx}-quiz`]} className={`text-[9px] font-black px-4 py-2 rounded-xl border transition ${sub.quiz ? 'bg-green-50 text-green-600 border-green-100' : 'bg-amber-50 text-amber-600 border-amber-100 hover:bg-amber-100'}`}>
-                      {loadingStates[`${idx}-quiz`] ? 'Génération...' : sub.quiz ? '✅ Quiz Généré' : '📝 Générer Quiz'}
-                    </button>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-gray-500 uppercase ml-1">Rédigez votre cours</label>
+                    <QuillEditor id={`sub-${idx}`} value={sub.content} onChange={(content) => {
+                      const subjects = [...editingSession.subjects!];
+                      subjects[idx].content = content;
+                      setEditingSession({...editingSession, subjects});
+                    }} />
                   </div>
 
-                  <QuillEditor id={`sub-${idx}`} value={sub.content} onChange={(content) => {
-                    const subjects = [...editingSession.subjects!];
-                    subjects[idx].content = content;
-                    setEditingSession({...editingSession, subjects});
-                  }} />
+                  <div className="flex justify-end pt-2">
+                    <button 
+                      onClick={() => handleAiQuiz(idx)} 
+                      disabled={!!loadingStates[`${idx}-quiz`]} 
+                      className={`flex items-center gap-2 text-[10px] font-black px-4 py-2 rounded-xl border transition-all ${sub.quiz && sub.quiz.length > 0 ? 'bg-green-50 text-green-600 border-green-200' : 'bg-indigo-50 text-indigo-600 border-indigo-100 hover:bg-indigo-100'}`}
+                    >
+                      {loadingStates[`${idx}-quiz`] ? (
+                        <>
+                          <div className="w-3 h-3 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                          <span>Génération du quiz...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>{sub.quiz && sub.quiz.length > 0 ? '✅ Quiz généré' : '📝 Générer le quiz'}</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
               ))}
-              <button onClick={addSubject} className="w-full border-4 border-dashed border-gray-100 p-6 rounded-[2.5rem] text-gray-300 font-black uppercase tracking-widest hover:border-blue-200 hover:text-blue-300 transition">+ Ajouter une matière</button>
+              
+              <button onClick={addSubject} className="w-full border-2 border-dashed border-gray-200 p-4 rounded-2xl text-gray-400 font-black uppercase text-[10px] tracking-widest hover:border-blue-200 hover:text-blue-400 hover:bg-white transition-all">
+                + Ajouter une matière
+              </button>
             </div>
 
-            <div className="p-10 border-t flex justify-end gap-4">
-               <button onClick={handleSave} className="bg-blue-600 text-white px-12 py-5 rounded-2xl font-black text-sm uppercase shadow-2xl hover:bg-blue-700 transition">Enregistrer Semaine</button>
+            <div className="p-6 border-t flex justify-end gap-3 bg-gray-50/50">
+               <button onClick={() => setEditingSession(null)} className="px-6 py-2 text-gray-400 font-bold uppercase text-[10px] hover:text-gray-600">Annuler</button>
+               <button onClick={handleSave} className="bg-blue-600 text-white px-10 py-3 rounded-xl font-black text-xs uppercase shadow-xl hover:bg-blue-700 transition">Enregistrer la semaine</button>
             </div>
           </div>
         </div>
