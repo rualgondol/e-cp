@@ -113,11 +113,11 @@ const SessionManager: React.FC<SessionManagerProps> = ({ club, sessions, setSess
         subjects[idx] = { ...subjects[idx], quiz: generatedQuiz };
         setEditingSession({ ...editingSession, subjects });
       } else {
-        alert("Erreur lors de la génération du quiz. Vérifiez votre clé API.");
+        alert("Erreur de génération : assurez-vous que la clé API Gemini est valide.");
       }
     } catch (e) {
       console.error(e);
-      alert("Erreur de connexion avec l'IA.");
+      alert("Erreur technique lors de la génération du quiz.");
     } finally {
       setLoadingStates(prev => ({ ...prev, [idx]: false }));
     }
@@ -164,57 +164,76 @@ const SessionManager: React.FC<SessionManagerProps> = ({ club, sessions, setSess
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
-              <div className="bg-white p-4 rounded-xl border border-gray-200 flex items-center gap-4">
-                <label className="text-[10px] font-black text-gray-400 uppercase">Date de libération :</label>
+              <div className="bg-white p-4 rounded-xl border border-gray-200 flex items-center gap-4 shadow-sm">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Date de libération :</label>
                 <input type="date" value={editingSession.availabilityDate} onChange={e => setEditingSession({...editingSession, availabilityDate: e.target.value})} className="bg-gray-50 border p-2 text-xs font-black rounded-lg outline-none" />
               </div>
 
               {editingSession.subjects?.map((sub, idx) => (
-                <div key={sub.id} className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
-                  <div className="bg-gray-50 px-6 py-3 border-b flex justify-between items-center">
+                <div key={sub.id} className="bg-white border border-gray-200 rounded-3xl overflow-hidden shadow-sm">
+                  {/* Bandeau de titre de la matière (évite le chevauchement avec l'icône poubelle) */}
+                  <div className="bg-gray-100/80 px-6 py-3 border-b flex justify-between items-center">
                     <div className="flex items-center gap-4">
-                       <span className="bg-blue-600 text-white w-6 h-6 flex items-center justify-center rounded-lg text-[10px] font-black">{idx + 1}</span>
-                       <div className="flex items-center gap-2">
-                         <div className={`w-2 h-2 rounded-full ${sub.quiz && sub.quiz.length > 0 ? 'bg-green-500' : 'bg-gray-300'}`}></div>
-                         <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">
-                           {sub.quiz && sub.quiz.length > 0 ? `${sub.quiz.length}/${sub.quiz.length} Questions` : 'Aucun Quiz'}
-                         </span>
+                       <span className="bg-blue-600 text-white w-7 h-7 flex items-center justify-center rounded-xl text-[11px] font-black shadow-md">{idx + 1}</span>
+                       <div className="flex flex-col">
+                         <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">État du Quiz</span>
+                         <div className="flex items-center gap-2">
+                           <div className={`w-2 h-2 rounded-full ${sub.quiz && sub.quiz.length >= 4 ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]' : 'bg-orange-400'}`}></div>
+                           <span className="text-[10px] font-black text-gray-700 uppercase">
+                             {sub.quiz && sub.quiz.length > 0 ? `${sub.quiz.length}/4 Questions` : 'Pas de Quiz'}
+                           </span>
+                         </div>
                        </div>
                     </div>
-                    <button onClick={() => removeSubject(idx)} className="text-red-400 hover:text-red-600 transition-colors text-xs font-black uppercase tracking-widest flex items-center gap-1">🗑️ Supprimer</button>
+                    <button onClick={() => removeSubject(idx)} className="bg-white p-2 rounded-xl text-red-500 hover:bg-red-50 transition-all shadow-sm border border-gray-200">
+                      <span className="text-[10px] font-black uppercase px-2">🗑️ Supprimer</span>
+                    </button>
                   </div>
-                  <div className="p-6 space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <input type="text" placeholder="Titre de la matière" value={sub.name} onChange={e => {
-                        const subjects = [...editingSession.subjects!];
-                        subjects[idx].name = e.target.value;
-                        setEditingSession({...editingSession, subjects});
-                      }} className="w-full bg-gray-50 text-xs font-black p-3 rounded-xl border outline-none" />
-                      <input type="text" placeholder="Pré-requis / Objectif" value={sub.prerequisite} onChange={e => {
-                        const subjects = [...editingSession.subjects!];
-                        subjects[idx].prerequisite = e.target.value;
-                        setEditingSession({...editingSession, subjects});
-                      }} className="w-full bg-gray-50 font-bold p-3 rounded-xl border text-xs outline-none" />
+
+                  <div className="p-6 space-y-4 bg-white">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black text-gray-400 uppercase ml-2 tracking-widest">Titre de la matière</label>
+                        <input type="text" placeholder="Ex: La création" value={sub.name} onChange={e => {
+                          const subjects = [...editingSession.subjects!];
+                          subjects[idx].name = e.target.value;
+                          setEditingSession({...editingSession, subjects});
+                        }} className="w-full bg-gray-50 text-xs font-black p-3 rounded-2xl border outline-none focus:border-blue-300" />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black text-gray-400 uppercase ml-2 tracking-widest">Objectif pédagogique</label>
+                        <input type="text" placeholder="Pré-requis..." value={sub.prerequisite} onChange={e => {
+                          const subjects = [...editingSession.subjects!];
+                          subjects[idx].prerequisite = e.target.value;
+                          setEditingSession({...editingSession, subjects});
+                        }} className="w-full bg-gray-50 font-bold p-3 rounded-2xl border text-xs outline-none focus:border-blue-300" />
+                      </div>
                     </div>
+                    
                     <QuillEditor id={`sub-${idx}`} value={sub.content} onChange={(content) => {
                       const subjects = [...editingSession.subjects!];
                       subjects[idx].content = content;
                       setEditingSession({...editingSession, subjects});
                     }} />
-                    <div className="flex justify-end pt-2">
-                      <button onClick={() => handleAiQuiz(idx)} disabled={loadingStates[idx]} className={`text-[9px] font-black px-4 py-2 rounded-xl transition-all shadow-sm ${loadingStates[idx] ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : sub.quiz?.length ? 'bg-green-50 text-green-600 border border-green-100' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}>
-                        {loadingStates[idx] ? '⚡ GÉNÉRATION...' : sub.quiz?.length ? '✅ QUIZ GÉNÉRÉ ('+sub.quiz.length+')' : '📝 CRÉER QUIZ IA'}
+
+                    <div className="flex justify-end pt-2 border-t border-gray-50">
+                      <button 
+                        onClick={() => handleAiQuiz(idx)} 
+                        disabled={loadingStates[idx]} 
+                        className={`text-[10px] font-black px-6 py-2.5 rounded-2xl transition-all shadow-md transform active:scale-95 ${loadingStates[idx] ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : sub.quiz?.length ? 'bg-green-600 text-white' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}
+                      >
+                        {loadingStates[idx] ? '⚡ GÉNÉRATION IA EN COURS...' : sub.quiz?.length ? '✅ QUIZ GÉNÉRÉ ('+sub.quiz.length+' QCM)' : '📝 GÉNÉRER LE QUIZ PAR IA'}
                       </button>
                     </div>
                   </div>
                 </div>
               ))}
-              <button onClick={addSubject} className="w-full border-2 border-dashed border-gray-200 p-6 rounded-2xl text-gray-400 font-black uppercase text-[10px] tracking-widest hover:bg-gray-50 transition-all">+ Ajouter une matière</button>
+              <button onClick={addSubject} className="w-full border-2 border-dashed border-gray-200 p-8 rounded-[2rem] text-gray-400 font-black uppercase text-[10px] tracking-widest hover:bg-gray-50 hover:border-blue-300 transition-all">+ Ajouter une nouvelle matière</button>
             </div>
 
-            <div className="p-6 border-t flex justify-end gap-3 bg-gray-50/50">
-               <button onClick={() => setEditingSession(null)} className="px-6 py-2 text-gray-400 font-bold uppercase text-[10px]">Annuler</button>
-               <button onClick={handleSave} className="bg-blue-600 text-white px-10 py-3 rounded-2xl font-black text-[10px] uppercase shadow-xl hover:bg-blue-700 transition-all">Enregistrer la semaine</button>
+            <div className="p-8 border-t flex justify-end gap-4 bg-gray-50/50">
+               <button onClick={() => setEditingSession(null)} className="px-8 py-3 text-gray-400 font-black uppercase text-[10px] tracking-widest">Annuler</button>
+               <button onClick={handleSave} className="bg-blue-600 text-white px-12 py-4 rounded-[1.5rem] font-black text-[11px] uppercase shadow-2xl hover:bg-blue-700 transition-all transform hover:-translate-y-1">Enregistrer la semaine</button>
             </div>
           </div>
         </div>
