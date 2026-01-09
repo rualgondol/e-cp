@@ -1,40 +1,54 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 
-// Initialisation de l'IA avec la clé API provenant exclusivement de process.env.API_KEY
-const getAIClient = () => {
+/**
+ * Génère le contenu pédagogique d'un cours en HTML.
+ */
+export async function generateSessionContent(title: string, subjectName: string, description: string) {
   const apiKey = process.env.API_KEY;
   if (!apiKey) {
-    throw new Error("La clé API Gemini est manquante. Vérifiez votre configuration.");
+    return "Erreur : La clé API Gemini n'est pas configurée dans l'environnement.";
   }
-  return new GoogleGenAI({ apiKey });
-};
 
-export async function generateSessionContent(title: string, subjectName: string, description: string) {
+  const ai = new GoogleGenAI({ apiKey });
+  const prompt = `Agis en tant qu'instructeur de club de jeunesse adventiste.
+  Génère un cours structuré et passionnant pour des enfants (Aventuriers ou Explorateurs).
+  Thème : ${subjectName}.
+  Objectif : ${description}.
+  Format : Retourne uniquement du HTML propre (utilisant h2, p, ul, li).
+  Ton : Pédagogique, biblique et encourageant.`;
+
   try {
-    const ai = getAIClient();
-    const prompt = `Génère un cours structuré pour un enfant de club de jeunesse adventiste. 
-    Thème : ${subjectName}. Objectif : ${description}. 
-    Format : HTML propre avec h2, p, ul/li. Ton : Pédagogique et spirituel.`;
-
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: prompt,
     });
-    return response.text || "Erreur de génération.";
+    return response.text || "Désolé, je n'ai pas pu générer le contenu du cours.";
   } catch (error) {
-    console.error("Gemini Content Error:", error);
-    return "Erreur lors de la génération du contenu.";
+    console.error("Gemini Content Generation Error:", error);
+    return "Une erreur est survenue lors de la communication avec l'IA.";
   }
 }
 
+/**
+ * Génère un quiz de 4 questions basé sur le contenu d'un cours.
+ */
 export async function generateQuizForSubject(subjectName: string, content: string) {
-  try {
-    const ai = getAIClient();
-    const prompt = `En te basant sur ce cours : "${content}", génère exactement 4 questions de quiz QCM pour enfants.
-    Chaque question doit avoir 4 options et un index de réponse correcte (0-3). 
-    Retourne UNIQUEMENT un tableau JSON valide.`;
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
+    console.error("Clé API manquante pour Gemini.");
+    return [];
+  }
 
+  const ai = new GoogleGenAI({ apiKey });
+  const prompt = `Basé sur le contenu suivant de la leçon "${subjectName}" : 
+  ---
+  ${content}
+  ---
+  Génère exactement 4 questions de quiz à choix multiples (QCM) pour tester la compréhension des enfants. 
+  Chaque question doit être claire, adaptée à l'âge et avoir une seule bonne réponse parmi 4 options.`;
+
+  try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: prompt,
@@ -45,24 +59,33 @@ export async function generateQuizForSubject(subjectName: string, content: strin
           items: {
             type: Type.OBJECT,
             properties: {
-              text: { type: Type.STRING },
-              options: { 
-                type: Type.ARRAY, 
-                items: { type: Type.STRING } 
+              text: {
+                type: Type.STRING,
+                description: 'Le texte de la question.',
               },
-              correctIndex: { type: Type.INTEGER }
+              options: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING },
+                description: 'Les 4 options de réponse possibles.',
+              },
+              correctIndex: {
+                type: Type.INTEGER,
+                description: 'L\'index (0-3) de la réponse correcte dans le tableau des options.',
+              },
             },
-            required: ["text", "options", "correctIndex"]
-          }
-        }
-      }
+            required: ["text", "options", "correctIndex"],
+          },
+        },
+      },
     });
+
+    const jsonStr = response.text;
+    if (!jsonStr) return [];
     
-    const text = response.text;
-    if (!text) return [];
-    return JSON.parse(text);
+    const quizData = JSON.parse(jsonStr.trim());
+    return Array.isArray(quizData) ? quizData : [];
   } catch (error) {
-    console.error("Gemini Quiz Error:", error);
+    console.error("Gemini Quiz Generation Error:", error);
     return [];
   }
 }
