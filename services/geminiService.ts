@@ -2,14 +2,34 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
 /**
- * Récupère et vérifie la clé API depuis l'environnement.
+ * Récupère la clé API de manière robuste.
+ * Vérifie process.env.API_KEY (standard), 
+ * puis les variantes liées à Vite/Vercel si nécessaire.
  */
 function getApiKey(): string | null {
-  const apiKey = process.env.API_KEY;
-  if (!apiKey || apiKey === "undefined" || apiKey === "null" || apiKey.trim() === "") {
-    return null;
+  try {
+    // 1. Priorité aux guidelines (process.env.API_KEY)
+    let key = process.env.API_KEY;
+
+    // 2. Fallback sur VITE_API_KEY (standard pour les builds Vite/Vercel côté client)
+    if (!key || key === "undefined") {
+      // @ts-ignore - Accès sécurisé au contexte de build
+      const metaEnv = (import.meta as any).env;
+      key = metaEnv?.VITE_API_KEY || metaEnv?.API_KEY;
+    }
+
+    // 3. Fallback sur le stockage local (pour le diagnostic et l'urgence)
+    if (!key || key === "undefined") {
+      key = localStorage.getItem('MJA_API_KEY') || localStorage.getItem('API_KEY');
+    }
+
+    if (key && key !== "undefined" && key !== "null" && key.trim() !== "") {
+      return key.trim().replace(/['"]/g, ''); // Nettoie les guillemets éventuels
+    }
+  } catch (e) {
+    console.warn("Erreur lors de la lecture de la clé API:", e);
   }
-  return apiKey.trim();
+  return null;
 }
 
 /**
@@ -17,11 +37,12 @@ function getApiKey(): string | null {
  */
 export async function generateSessionContent(title: string, subjectName: string, description: string) {
   const apiKey = getApiKey();
+  
   if (!apiKey) {
-    return "Erreur : La clé API Gemini n'est pas détectée. Vérifiez vos variables d'environnement sur Vercel (nom exact: API_KEY).";
+    return `ERREUR CONFIGURATION : Clé API introuvable. 
+    Sur Vercel, renommez votre variable en 'VITE_API_KEY' (le préfixe VITE_ est requis pour le frontend) et faites un REDEPLOY.`;
   }
 
-  // Création d'une nouvelle instance à chaque appel pour éviter les problèmes de contexte
   const ai = new GoogleGenAI({ apiKey });
 
   const prompt = `Agis en tant qu'instructeur de club de jeunesse adventiste (MJA).
@@ -40,11 +61,8 @@ export async function generateSessionContent(title: string, subjectName: string,
     
     return response.text || "Désolé, je n'ai pas pu générer le contenu du cours.";
   } catch (error: any) {
-    console.error("Gemini Content Generation Error:", error);
-    if (error.message?.includes("API key not valid")) {
-      return "Erreur : La clé API fournie est rejetée par Google. Vérifiez qu'elle est bien active dans Google AI Studio.";
-    }
-    return `Une erreur est survenue : ${error.message || "Erreur inconnue"}`;
+    console.error("Gemini Content Error:", error);
+    return `Erreur Gemini (${error.status || 'API'}): ${error.message}`;
   }
 }
 
@@ -54,7 +72,7 @@ export async function generateSessionContent(title: string, subjectName: string,
 export async function generateQuizForSubject(subjectName: string, content: string) {
   const apiKey = getApiKey();
   if (!apiKey) {
-    console.error("Clé API manquante ou invalide.");
+    console.error("Clé API Gemini manquante.");
     return [];
   }
 
@@ -101,14 +119,9 @@ export async function generateQuizForSubject(subjectName: string, content: strin
     const jsonStr = response.text;
     if (!jsonStr) return [];
     
-    const quizData = JSON.parse(jsonStr.trim());
-    return Array.isArray(quizData) ? quizData : [];
+    return JSON.parse(jsonStr.trim());
   } catch (error: any) {
-    console.error("Gemini Quiz Generation Error:", error);
-    // En cas d'erreur de clé spécifique renvoyée par l'API
-    if (error.message?.includes("Requested entity was not found")) {
-      console.error("Le modèle spécifié est introuvable ou la clé ne permet pas d'y accéder.");
-    }
+    console.error("Gemini Quiz Error:", error);
     return [];
   }
 }
