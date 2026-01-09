@@ -16,7 +16,6 @@ const QuillEditor: React.FC<{ value: string; onChange: (content: string) => void
 
   useEffect(() => {
     if (editorRef.current && !quillInstance.current) {
-      // Initialisation unique
       quillInstance.current = new window.Quill(editorRef.current, {
         theme: 'snow',
         modules: {
@@ -30,7 +29,6 @@ const QuillEditor: React.FC<{ value: string; onChange: (content: string) => void
         placeholder: 'Rédigez le contenu du cours ici...'
       });
 
-      // Synchronisation vers le parent
       quillInstance.current.on('text-change', () => {
         if (!isUpdating.current) {
           const html = quillInstance.current.root.innerHTML;
@@ -39,15 +37,13 @@ const QuillEditor: React.FC<{ value: string; onChange: (content: string) => void
       });
     }
 
-    // Chargement initial de la valeur
     if (quillInstance.current && value !== quillInstance.current.root.innerHTML) {
       isUpdating.current = true;
       quillInstance.current.root.innerHTML = value || '';
       isUpdating.current = false;
     }
-  }, []); // On ne redémarre JAMAIS l'effet, on gère les updates à part
+  }, []);
 
-  // Mise à jour de la valeur si elle change de l'extérieur (ex: reset ou switch de session)
   useEffect(() => {
     if (quillInstance.current && value !== quillInstance.current.root.innerHTML && !isUpdating.current) {
       isUpdating.current = true;
@@ -73,7 +69,7 @@ interface SessionManagerProps {
 const SessionManager: React.FC<SessionManagerProps> = ({ club, sessions, setSessions, classes }) => {
   const [editingSession, setEditingSession] = useState<Partial<Session> | null>(null);
   const [selectedClass, setSelectedClass] = useState<string>(classes.find(c => c.club === club)?.id || '');
-  const [loadingStates, setLoadingStates] = useState<Record<string, 'quiz' | null>>({});
+  const [loadingStates, setLoadingStates] = useState<Record<string, boolean>>({});
 
   const handleSave = () => {
     if (!editingSession) return;
@@ -95,7 +91,7 @@ const SessionManager: React.FC<SessionManagerProps> = ({ club, sessions, setSess
 
   const addSubject = () => {
     const subjects = [...(editingSession?.subjects || [])];
-    subjects.push({ id: Math.random().toString(36).substr(2, 5), name: '', prerequisite: '', content: '' });
+    subjects.push({ id: Math.random().toString(36).substr(2, 5), name: '', prerequisite: '', content: '', quiz: [] });
     setEditingSession({ ...editingSession, subjects });
   };
 
@@ -108,12 +104,23 @@ const SessionManager: React.FC<SessionManagerProps> = ({ club, sessions, setSess
   const handleAiQuiz = async (idx: number) => {
     const sub = editingSession?.subjects?.[idx];
     if (!sub?.name || !sub?.content) return alert("Veuillez d'abord écrire le contenu du cours.");
-    setLoadingStates(prev => ({ ...prev, [`${idx}-quiz`]: 'quiz' }));
-    const generatedQuiz = await generateQuizForSubject(sub.name, sub.content);
-    const subjects = [...(editingSession!.subjects!)];
-    subjects[idx] = { ...subjects[idx], quiz: generatedQuiz };
-    setEditingSession({ ...editingSession, subjects });
-    setLoadingStates(prev => ({ ...prev, [`${idx}-quiz`]: null }));
+    
+    setLoadingStates(prev => ({ ...prev, [idx]: true }));
+    try {
+      const generatedQuiz = await generateQuizForSubject(sub.name, sub.content);
+      if (generatedQuiz && generatedQuiz.length > 0) {
+        const subjects = [...(editingSession!.subjects!)];
+        subjects[idx] = { ...subjects[idx], quiz: generatedQuiz };
+        setEditingSession({ ...editingSession, subjects });
+      } else {
+        alert("Erreur lors de la génération du quiz. Vérifiez votre clé API.");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Erreur de connexion avec l'IA.");
+    } finally {
+      setLoadingStates(prev => ({ ...prev, [idx]: false }));
+    }
   };
 
   return (
@@ -121,11 +128,7 @@ const SessionManager: React.FC<SessionManagerProps> = ({ club, sessions, setSess
       <div className="flex flex-col sm:flex-row justify-between items-center bg-white p-5 rounded-2xl shadow-sm border border-gray-100 gap-4">
         <div className="flex flex-wrap gap-2">
           {classes.filter(c => c.club === club).map(cls => (
-            <button 
-                key={cls.id} 
-                onClick={() => setSelectedClass(cls.id)} 
-                className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase border transition-all flex items-center gap-2 ${selectedClass === cls.id ? 'bg-blue-600 text-white shadow-md border-blue-600' : 'bg-white hover:bg-gray-50 border-gray-200 text-gray-500'}`}
-            >
+            <button key={cls.id} onClick={() => setSelectedClass(cls.id)} className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase border transition-all flex items-center gap-2 ${selectedClass === cls.id ? 'bg-blue-600 text-white shadow-md border-blue-600' : 'bg-white hover:bg-gray-50 border-gray-200 text-gray-500'}`}>
               <span className="w-4 h-4 flex items-center justify-center overflow-hidden rounded">
                 {cls.icon && cls.icon.length > 5 ? <img src={cls.icon} className="w-full h-full object-cover" alt="" /> : cls.icon || '⛺'}
               </span>
@@ -142,8 +145,9 @@ const SessionManager: React.FC<SessionManagerProps> = ({ club, sessions, setSess
             <h3 className="text-base font-black text-gray-900 tracking-tight uppercase mb-3 pb-2 border-b">Semaine {session.number}</h3>
             <div className="space-y-2">
               {session.subjects.map((sub, i) => (
-                <div key={i} className="bg-gray-50 p-2 rounded-xl border border-gray-100">
-                  <span className="text-[10px] font-black text-gray-800 leading-tight block">{sub.name}</span>
+                <div key={i} className="bg-gray-50 p-2 rounded-xl border border-gray-100 flex justify-between items-center">
+                  <span className="text-[10px] font-black text-gray-800 leading-tight">{sub.name}</span>
+                  {sub.quiz && sub.quiz.length > 0 && <span className="text-[8px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-black">{sub.quiz.length} QCM</span>}
                 </div>
               ))}
             </div>
@@ -166,38 +170,51 @@ const SessionManager: React.FC<SessionManagerProps> = ({ club, sessions, setSess
               </div>
 
               {editingSession.subjects?.map((sub, idx) => (
-                <div key={sub.id} className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4 shadow-sm relative">
-                  <button onClick={() => removeSubject(idx)} className="absolute top-6 right-6 text-gray-300 hover:text-red-500 transition-colors">🗑️</button>
-                  <div className="grid grid-cols-2 gap-4">
-                    <input type="text" placeholder="Titre de la matière" value={sub.name} onChange={e => {
-                      const subjects = [...editingSession.subjects!];
-                      subjects[idx].name = e.target.value;
-                      setEditingSession({...editingSession, subjects});
-                    }} className="w-full bg-gray-50 text-xs font-black p-3 rounded-xl border outline-none" />
-                    <input type="text" placeholder="Pré-requis / Objectif" value={sub.prerequisite} onChange={e => {
-                      const subjects = [...editingSession.subjects!];
-                      subjects[idx].prerequisite = e.target.value;
-                      setEditingSession({...editingSession, subjects});
-                    }} className="w-full bg-gray-50 font-bold p-3 rounded-xl border text-xs outline-none" />
+                <div key={sub.id} className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+                  <div className="bg-gray-50 px-6 py-3 border-b flex justify-between items-center">
+                    <div className="flex items-center gap-4">
+                       <span className="bg-blue-600 text-white w-6 h-6 flex items-center justify-center rounded-lg text-[10px] font-black">{idx + 1}</span>
+                       <div className="flex items-center gap-2">
+                         <div className={`w-2 h-2 rounded-full ${sub.quiz && sub.quiz.length > 0 ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                         <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">
+                           {sub.quiz && sub.quiz.length > 0 ? `${sub.quiz.length}/${sub.quiz.length} Questions` : 'Aucun Quiz'}
+                         </span>
+                       </div>
+                    </div>
+                    <button onClick={() => removeSubject(idx)} className="text-red-400 hover:text-red-600 transition-colors text-xs font-black uppercase tracking-widest flex items-center gap-1">🗑️ Supprimer</button>
                   </div>
-                  <QuillEditor id={`sub-${idx}`} value={sub.content} onChange={(content) => {
-                    const subjects = [...editingSession.subjects!];
-                    subjects[idx].content = content;
-                    setEditingSession({...editingSession, subjects});
-                  }} />
-                  <div className="flex justify-end pt-2">
-                    <button onClick={() => handleAiQuiz(idx)} disabled={!!loadingStates[`${idx}-quiz`]} className="text-[9px] font-black px-4 py-2 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100 hover:bg-indigo-100">
-                      {loadingStates[`${idx}-quiz`] ? 'Génération...' : sub.quiz?.length ? '✅ Quiz OK' : '📝 Créer Quiz IA'}
-                    </button>
+                  <div className="p-6 space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <input type="text" placeholder="Titre de la matière" value={sub.name} onChange={e => {
+                        const subjects = [...editingSession.subjects!];
+                        subjects[idx].name = e.target.value;
+                        setEditingSession({...editingSession, subjects});
+                      }} className="w-full bg-gray-50 text-xs font-black p-3 rounded-xl border outline-none" />
+                      <input type="text" placeholder="Pré-requis / Objectif" value={sub.prerequisite} onChange={e => {
+                        const subjects = [...editingSession.subjects!];
+                        subjects[idx].prerequisite = e.target.value;
+                        setEditingSession({...editingSession, subjects});
+                      }} className="w-full bg-gray-50 font-bold p-3 rounded-xl border text-xs outline-none" />
+                    </div>
+                    <QuillEditor id={`sub-${idx}`} value={sub.content} onChange={(content) => {
+                      const subjects = [...editingSession.subjects!];
+                      subjects[idx].content = content;
+                      setEditingSession({...editingSession, subjects});
+                    }} />
+                    <div className="flex justify-end pt-2">
+                      <button onClick={() => handleAiQuiz(idx)} disabled={loadingStates[idx]} className={`text-[9px] font-black px-4 py-2 rounded-xl transition-all shadow-sm ${loadingStates[idx] ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : sub.quiz?.length ? 'bg-green-50 text-green-600 border border-green-100' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}>
+                        {loadingStates[idx] ? '⚡ GÉNÉRATION...' : sub.quiz?.length ? '✅ QUIZ GÉNÉRÉ ('+sub.quiz.length+')' : '📝 CRÉER QUIZ IA'}
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
-              <button onClick={addSubject} className="w-full border-2 border-dashed border-gray-200 p-4 rounded-2xl text-gray-400 font-black uppercase text-[10px] tracking-widest hover:bg-gray-50 transition-colors">+ Ajouter une matière</button>
+              <button onClick={addSubject} className="w-full border-2 border-dashed border-gray-200 p-6 rounded-2xl text-gray-400 font-black uppercase text-[10px] tracking-widest hover:bg-gray-50 transition-all">+ Ajouter une matière</button>
             </div>
 
             <div className="p-6 border-t flex justify-end gap-3 bg-gray-50/50">
                <button onClick={() => setEditingSession(null)} className="px-6 py-2 text-gray-400 font-bold uppercase text-[10px]">Annuler</button>
-               <button onClick={handleSave} className="bg-blue-600 text-white px-10 py-3 rounded-2xl font-black text-[10px] uppercase shadow-xl hover:bg-blue-700 transition-all">Enregistrer</button>
+               <button onClick={handleSave} className="bg-blue-600 text-white px-10 py-3 rounded-2xl font-black text-[10px] uppercase shadow-xl hover:bg-blue-700 transition-all">Enregistrer la semaine</button>
             </div>
           </div>
         </div>

@@ -2,6 +2,42 @@
 import React, { useState, useMemo } from 'react';
 import { ClubType, Student, Progress, Message, ClassLevel, EmergencyContact } from '../../types';
 
+const TagInput: React.FC<{ tags: string[]; onChange: (tags: string[]) => void; placeholder: string; colorClass: string }> = ({ tags, onChange, placeholder, colorClass }) => {
+  const [inputValue, setInputValue] = useState('');
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && inputValue.trim()) {
+      e.preventDefault();
+      if (!tags.includes(inputValue.trim())) {
+        onChange([...tags, inputValue.trim()]);
+      }
+      setInputValue('');
+    }
+  };
+
+  const removeTag = (index: number) => {
+    onChange(tags.filter((_, i) => i !== index));
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className={`flex flex-wrap gap-1.5 p-2 bg-gray-50 border-2 border-gray-100 rounded-2xl min-h-[44px]`}>
+        {tags.map((tag, i) => (
+          <span key={i} className={`${colorClass} text-white px-2 py-1 rounded-lg text-[9px] font-black flex items-center gap-1.5 shadow-sm`}>
+            {tag}
+            <button onClick={() => removeTag(i)} className="hover:text-black transition-colors">✕</button>
+          </span>
+        ))}
+        <input 
+          type="text" value={inputValue} onChange={e => setInputValue(e.target.value)} onKeyDown={handleKeyDown}
+          placeholder={tags.length === 0 ? placeholder : "Appuyez sur Entrée..."}
+          className="bg-transparent border-none outline-none text-xs font-bold flex-1 min-w-[120px]"
+        />
+      </div>
+    </div>
+  );
+};
+
 interface StudentManagerProps {
   club: ClubType;
   students: Student[];
@@ -45,6 +81,16 @@ const StudentManager: React.FC<StudentManagerProps> = ({ club, students, setStud
     }
   };
 
+  const handleResetPassword = (student: Student) => {
+    const newTemp = 'MJA' + Math.floor(1000 + Math.random() * 9000);
+    if (editingStudent) {
+      setEditingStudent({ ...editingStudent, passwordChanged: false, temporaryPassword: newTemp, password: "" });
+    } else {
+      setStudents(prev => prev.map(s => s.id === student.id ? { ...s, passwordChanged: false, temporaryPassword: newTemp, password: "" } : s));
+    }
+    alert("Mot de passe réinitialisé : " + newTemp);
+  };
+
   const handleAddSubmit = () => {
     if (!newStudentData.fullName || !newStudentData.birthDate) return;
     const birthYear = new Date(newStudentData.birthDate).getFullYear();
@@ -65,16 +111,11 @@ const StudentManager: React.FC<StudentManagerProps> = ({ club, students, setStud
       allergies: newStudentData.allergies || [],
       medications: newStudentData.medications || [],
       passwordChanged: false,
-      temporaryPassword: 'MJA' + Math.floor(1000 + Math.random() * 9000)
+      temporaryPassword: newStudentData.temporaryPassword || ('MJA' + Math.floor(1000 + Math.random() * 9000))
     };
     setStudents(prev => [...prev, student]);
     setIsAdding(false);
-    // Reset form
-    setNewStudentData({
-      fullName: '', birthDate: '', address: '', motherName: '', fatherName: '',
-      emergencyContacts: [{ name: '', phone: '', relationship: '' }, { name: '', phone: '', relationship: '' }],
-      diseases: [], allergies: [], medications: []
-    });
+    setNewStudentData({ fullName: '', birthDate: '', address: '', motherName: '', fatherName: '', emergencyContacts: [{ name: '', phone: '', relationship: '' }, { name: '', phone: '', relationship: '' }], diseases: [], allergies: [], medications: [] });
   };
 
   const handleEditSubmit = () => {
@@ -133,7 +174,13 @@ const StudentManager: React.FC<StudentManagerProps> = ({ club, students, setStud
                 <div className="flex flex-wrap justify-center md:justify-start gap-6">
                   <div className="flex flex-col"><span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Naissance</span><span className="font-bold text-gray-800 text-sm">{new Date(selectedStudent.birthDate).toLocaleDateString()}</span></div>
                   <div className="flex flex-col"><span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Adresse</span><span className="font-bold text-gray-800 text-sm truncate max-w-[200px]">{selectedStudent.address || "Non renseignée"}</span></div>
-                  <div className="flex flex-col"><span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Code Accès</span><span className="font-mono text-[10px] bg-gray-100 px-2 py-0.5 rounded border">{selectedStudent.temporaryPassword || "Défini"}</span></div>
+                  <div className="flex flex-col">
+                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Code Accès</span>
+                    <div className="flex items-center gap-2">
+                       <span className="font-mono text-[10px] bg-gray-100 px-2 py-0.5 rounded border">{selectedStudent.passwordChanged ? "Défini" : (selectedStudent.temporaryPassword || "—")}</span>
+                       <button onClick={() => handleResetPassword(selectedStudent)} className="text-[8px] font-black text-red-500 uppercase underline">Réinitialiser</button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -196,13 +243,29 @@ const StudentManager: React.FC<StudentManagerProps> = ({ club, students, setStud
                     <div className="w-20 h-20 rounded-2xl bg-gray-100 relative group overflow-hidden flex-shrink-0 border-2 border-dashed border-gray-200">
                       {(editingStudent?.photo || newStudentData.photo) && <img src={editingStudent?.photo || newStudentData.photo} className="w-full h-full object-cover" alt="" />}
                       <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handlePhotoUpload(e, !!editingStudent)} />
-                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><span className="text-white text-[9px] font-black uppercase">Changer Photo</span></div>
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><span className="text-white text-[9px] font-black uppercase text-center p-2">Changer Photo</span></div>
                     </div>
-                    <input type="text" placeholder="Nom et Prénom" value={editingStudent ? editingStudent.fullName : newStudentData.fullName} onChange={e => editingStudent ? setEditingStudent({...editingStudent, fullName: e.target.value}) : setNewStudentData({...newStudentData, fullName: e.target.value})} className="flex-1 border-2 border-gray-100 p-3 rounded-2xl font-bold text-sm outline-none focus:border-blue-400" />
+                    <input type="text" placeholder="Nom et Prénom" value={editingStudent ? editingStudent.fullName : newStudentData.fullName} onChange={e => editingStudent ? setEditingStudent({...editingStudent, fullName: e.target.value}) : setNewStudentData({...newStudentData, fullName: e.target.value})} className="flex-1 border-2 border-gray-100 p-3 rounded-2xl font-bold text-sm outline-none focus:border-blue-400 shadow-sm" />
                   </div>
                   <div className="space-y-1">
                     <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Date de naissance</label>
                     <input type="date" value={editingStudent ? editingStudent.birthDate : newStudentData.birthDate} onChange={e => editingStudent ? setEditingStudent({...editingStudent, birthDate: e.target.value}) : setNewStudentData({...newStudentData, birthDate: e.target.value})} className="w-full border-2 border-gray-100 p-3 rounded-2xl text-sm font-bold" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Code Accès Temporaire</label>
+                    <div className="flex gap-2">
+                       <input 
+                         type="text" 
+                         disabled={!!editingStudent?.passwordChanged}
+                         value={editingStudent ? (editingStudent.passwordChanged ? "Défini par l'utilisateur" : editingStudent.temporaryPassword) : newStudentData.temporaryPassword} 
+                         onChange={e => editingStudent ? setEditingStudent({...editingStudent, temporaryPassword: e.target.value}) : setNewStudentData({...newStudentData, temporaryPassword: e.target.value})} 
+                         className="flex-1 border-2 border-gray-100 p-3 rounded-2xl text-xs font-black uppercase bg-gray-50 disabled:opacity-50" 
+                         placeholder="Auto-généré si vide" 
+                       />
+                       {editingStudent?.passwordChanged && (
+                         <button onClick={() => handleResetPassword(editingStudent)} className="bg-red-50 text-red-600 px-3 rounded-xl text-[8px] font-black uppercase border border-red-100">Reset</button>
+                       )}
+                    </div>
                   </div>
                   <div className="space-y-1">
                     <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Adresse Domicile</label>
@@ -224,7 +287,7 @@ const StudentManager: React.FC<StudentManagerProps> = ({ club, students, setStud
                         const contacts = [...(editingStudent ? editingStudent.emergencyContacts : newStudentData.emergencyContacts!)];
                         contacts[i] = { ...contacts[i], name: e.target.value };
                         editingStudent ? setEditingStudent({...editingStudent, emergencyContacts: contacts}) : setNewStudentData({...newStudentData, emergencyContacts: contacts});
-                      }} className="w-full p-2 text-xs rounded-xl border-gray-200 border bg-white" />
+                      }} className="w-full p-2 text-xs rounded-xl border-gray-200 border bg-white shadow-sm" />
                       <div className="grid grid-cols-2 gap-2">
                         <input type="text" placeholder="Relation" value={editingStudent ? editingStudent.emergencyContacts[i]?.relationship : newStudentData.emergencyContacts?.[i]?.relationship} onChange={e => {
                           const contacts = [...(editingStudent ? editingStudent.emergencyContacts : newStudentData.emergencyContacts!)];
@@ -241,43 +304,49 @@ const StudentManager: React.FC<StudentManagerProps> = ({ club, students, setStud
                   ))}
                 </div>
 
-                {/* 3. MEDICAL */}
+                {/* 3. MEDICAL (Tags system) */}
                 <div className="space-y-6">
-                  <label className="text-[10px] font-black uppercase text-red-600 tracking-widest border-b pb-2 block">3. Santé (Détails)</label>
+                  <label className="text-[10px] font-black uppercase text-red-600 tracking-widest border-b pb-2 block">3. Santé (Tapez + Entrée)</label>
                   <div className="space-y-4">
                     <div className="space-y-1">
-                      <label className="text-[9px] font-black text-red-400 uppercase ml-1">Maladies (séparer par virgule)</label>
-                      <input type="text" placeholder="Ex: Asthme, Diabète..." value={editingStudent ? editingStudent.diseases.join(', ') : newStudentData.diseases?.join(', ')} onChange={e => {
-                        const list = e.target.value.split(',').map(s => s.trim()).filter(s => s !== "");
-                        editingStudent ? setEditingStudent({...editingStudent, diseases: list}) : setNewStudentData({...newStudentData, diseases: list});
-                      }} className="w-full border-2 border-red-50 p-3 rounded-2xl text-xs font-bold" />
+                      <label className="text-[9px] font-black text-red-400 uppercase ml-1">Maladies</label>
+                      <TagInput 
+                        tags={editingStudent ? editingStudent.diseases : newStudentData.diseases || []} 
+                        onChange={tags => editingStudent ? setEditingStudent({...editingStudent, diseases: tags}) : setNewStudentData({...newStudentData, diseases: tags})} 
+                        placeholder="Ajouter une maladie..." 
+                        colorClass="bg-red-500" 
+                      />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[9px] font-black text-orange-400 uppercase ml-1">Allergies (séparer par virgule)</label>
-                      <input type="text" placeholder="Ex: Arachides, Pénicilline..." value={editingStudent ? editingStudent.allergies.join(', ') : newStudentData.allergies?.join(', ')} onChange={e => {
-                        const list = e.target.value.split(',').map(s => s.trim()).filter(s => s !== "");
-                        editingStudent ? setEditingStudent({...editingStudent, allergies: list}) : setNewStudentData({...newStudentData, allergies: list});
-                      }} className="w-full border-2 border-orange-50 p-3 rounded-2xl text-xs font-bold" />
+                      <label className="text-[9px] font-black text-orange-400 uppercase ml-1">Allergies</label>
+                      <TagInput 
+                        tags={editingStudent ? editingStudent.allergies : newStudentData.allergies || []} 
+                        onChange={tags => editingStudent ? setEditingStudent({...editingStudent, allergies: tags}) : setNewStudentData({...newStudentData, allergies: tags})} 
+                        placeholder="Ajouter une allergie..." 
+                        colorClass="bg-orange-500" 
+                      />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[9px] font-black text-blue-400 uppercase ml-1">Médicaments (séparer par virgule)</label>
-                      <input type="text" placeholder="Ex: Ventoline, Insuline..." value={editingStudent ? editingStudent.medications.join(', ') : newStudentData.medications?.join(', ')} onChange={e => {
-                        const list = e.target.value.split(',').map(s => s.trim()).filter(s => s !== "");
-                        editingStudent ? setEditingStudent({...editingStudent, medications: list}) : setNewStudentData({...newStudentData, medications: list});
-                      }} className="w-full border-2 border-blue-50 p-3 rounded-2xl text-xs font-bold" />
+                      <label className="text-[9px] font-black text-blue-400 uppercase ml-1">Médicaments</label>
+                      <TagInput 
+                        tags={editingStudent ? editingStudent.medications : newStudentData.medications || []} 
+                        onChange={tags => editingStudent ? setEditingStudent({...editingStudent, medications: tags}) : setNewStudentData({...newStudentData, medications: tags})} 
+                        placeholder="Ajouter un médicament..." 
+                        colorClass="bg-blue-500" 
+                      />
                     </div>
                   </div>
                   <div className="mt-8 p-4 bg-yellow-50 rounded-2xl border border-yellow-100 flex gap-3 items-start shadow-sm">
                     <span className="text-xl">⚠️</span>
-                    <p className="text-[9px] text-yellow-700 font-bold leading-tight uppercase tracking-wide">Vérifiez l'exactitude des données de santé. Elles sont cruciales en cas d'intervention médicale.</p>
+                    <p className="text-[9px] text-yellow-700 font-bold leading-tight uppercase tracking-wide">Vérifiez l'exactitude des données de santé avant d'enregistrer le dossier.</p>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="p-8 border-t flex justify-end gap-4 bg-gray-50/80 sticky bottom-0 z-20">
+            <div className="p-8 border-t flex justify-end gap-4 bg-gray-50/80 sticky bottom-0 z-20 shadow-inner">
               <button onClick={() => { setIsAdding(false); setEditingStudent(null); }} className="px-6 py-2 text-gray-400 font-black uppercase text-[10px] tracking-widest hover:text-gray-600 transition-colors">Annuler</button>
-              <button onClick={editingStudent ? handleEditSubmit : handleAddSubmit} className="bg-blue-600 text-white px-10 py-4 rounded-2xl font-black text-xs uppercase shadow-2xl hover:bg-blue-700 transition-all transform active:scale-95">Enregistrer le Dossier</button>
+              <button onClick={editingStudent ? handleEditSubmit : handleAddSubmit} className="bg-blue-600 text-white px-10 py-4 rounded-2xl font-black text-xs uppercase shadow-2xl hover:bg-blue-700 transition-all transform active:scale-95">Valider le Dossier</button>
             </div>
           </div>
         </div>
