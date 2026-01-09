@@ -77,10 +77,11 @@ export const db = {
     return data || [];
   },
 
-  async syncStudents(students: Student[]) {
+  async syncStudentSingle(student: Student) {
     const client = initSupabase();
     if (!client) return;
-    await client.from('students').upsert(students);
+    const { error } = await client.from('students').upsert(student);
+    if (error) console.error("Sync Student Error:", error.message);
   },
 
   async fetchSessions(): Promise<Session[]> {
@@ -90,10 +91,11 @@ export const db = {
     return data || [];
   },
 
-  async syncSessions(sessions: Session[]) {
+  async syncSessionSingle(session: Session) {
     const client = initSupabase();
     if (!client) return;
-    await client.from('sessions').upsert(sessions);
+    const { error } = await client.from('sessions').upsert(session);
+    if (error) console.error("Sync Session Error:", error.message);
   },
 
   async fetchProgress(): Promise<Progress[]> {
