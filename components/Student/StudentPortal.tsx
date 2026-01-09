@@ -47,6 +47,15 @@ const StudentPortal: React.FC<StudentPortalProps> = ({
   const myProgress = progress.filter(p => p.studentId === studentId);
   const theme = studentClass ? THEMES[studentClass.club] : THEMES['AVENTURIERS'];
 
+  // Calcul du statut d'acquisition de la classe
+  const isClassAcquired = useMemo(() => {
+    if (mySessions.length === 0) return false;
+    return mySessions.every(session => {
+      const prog = myProgress.find(p => p.sessionId === session.id);
+      return prog?.completed === true;
+    });
+  }, [mySessions, myProgress]);
+
   const unreadCount = useMemo(() => 
     messages.filter(m => m.receiverId === studentId && !m.isRead).length
   , [messages, studentId]);
@@ -122,6 +131,33 @@ const StudentPortal: React.FC<StudentPortalProps> = ({
         </div>
       </header>
 
+      {/* Statut d'acquisition de classe - Affichage spécial */}
+      {!activeSessionId && view === 'courses' && (
+        <div className="max-w-6xl mx-auto w-full px-4 pt-6 md:px-8">
+           <div className={`p-6 rounded-[2.5rem] flex flex-col md:flex-row items-center gap-6 border-2 transition-all duration-700 shadow-xl overflow-hidden relative ${isClassAcquired ? 'bg-yellow-50 border-yellow-200' : 'bg-white border-gray-100'}`}>
+              <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-200/20 blur-3xl rounded-full -mr-10 -mt-10"></div>
+              <div className="w-24 h-24 bg-white rounded-3xl border shadow-inner flex items-center justify-center overflow-hidden p-2 flex-shrink-0">
+                 {studentClass.icon && studentClass.icon.length > 5 ? (
+                   <img src={studentClass.icon} className="w-full h-full object-contain" alt="" />
+                 ) : (
+                   <span className="text-5xl">{studentClass.icon || '⛺'}</span>
+                 )}
+              </div>
+              <div className="text-center md:text-left">
+                 <h2 className="text-2xl font-black text-gray-900 uppercase tracking-tighter">{studentClass.name}</h2>
+                 <p className={`text-[10px] font-black uppercase tracking-[0.2em] mt-1 ${isClassAcquired ? 'text-yellow-600' : 'text-blue-500'}`}>
+                    {isClassAcquired ? '🏆 Statut : CLASSE ACQUISE' : '📖 Statut : EN COURS D\'ACQUISITION'}
+                 </p>
+              </div>
+              <div className="flex-1 flex justify-center md:justify-end">
+                  <div className={`px-8 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg ${isClassAcquired ? 'bg-yellow-500 text-white animate-bounce' : 'bg-gray-100 text-gray-400'}`}>
+                    {isClassAcquired ? 'Félicitations !' : `${myProgress.filter(p => p.completed).length} / ${mySessions.length} Validées`}
+                  </div>
+              </div>
+           </div>
+        </div>
+      )}
+
       <main className="flex-1 max-w-6xl mx-auto w-full p-4 md:p-8 pb-32">
         {activeSessionId ? (
           <SessionViewer 
@@ -145,7 +181,7 @@ const StudentPortal: React.FC<StudentPortalProps> = ({
           />
         ) : (
           view === 'courses' ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 lg:gap-8 animate-fade-in">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 lg:gap-8 animate-fade-in mt-6">
               {mySessions.map(s => (
                 <CourseCard 
                   key={s.id} session={s} theme={theme}
