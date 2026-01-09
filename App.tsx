@@ -138,9 +138,10 @@ const App: React.FC = () => {
     };
   }, [dbStatus]);
 
+  // Use type casting to fix narrowing for React.SetStateAction
   const updateClubLogos = (action: React.SetStateAction<Record<ClubType, string>>) => {
     setClubLogos(prev => {
-      const next = typeof action === 'function' ? action(prev) : action;
+      const next = typeof action === 'function' ? (action as (prevState: Record<ClubType, string>) => Record<ClubType, string>)(prev) : action;
       if (dbStatus === 'connected') {
         Object.entries(next).forEach(([club, logo]) => {
           if (prev[club as ClubType] !== logo) {
@@ -157,9 +158,10 @@ const App: React.FC = () => {
     if (dbStatus === 'connected') db.syncInstructors(instructors);
   }, [instructors, dbStatus]);
 
+  // Use type casting to fix narrowing for React.SetStateAction
   const updateSessions = (newSessions: React.SetStateAction<Session[]>) => {
     setSessions(prev => {
-      const next = typeof newSessions === 'function' ? newSessions(prev) : newSessions;
+      const next = typeof newSessions === 'function' ? (newSessions as (prevState: Session[]) => Session[])(prev) : newSessions;
       if (dbStatus === 'connected') {
         const changed = next.find((s, i) => JSON.stringify(s) !== JSON.stringify(prev[i])) || next[next.length - 1];
         if (changed) db.syncSessionSingle(changed).catch(e => console.error(e));
@@ -168,9 +170,10 @@ const App: React.FC = () => {
     });
   };
 
+  // Use type casting to fix narrowing for React.SetStateAction
   const updateProgress = (newProgress: React.SetStateAction<Progress[]>) => {
     setProgress(prev => {
-      const next = typeof newProgress === 'function' ? newProgress(prev) : newProgress;
+      const next = typeof newProgress === 'function' ? (newProgress as (prevState: Progress[]) => Progress[])(prev) : newProgress;
       if (dbStatus === 'connected') {
         const changed = next.find((p, i) => JSON.stringify(p) !== JSON.stringify(prev[i])) || next[next.length - 1];
         if (changed) db.syncProgressSingle(changed).catch(e => console.error(e));
@@ -179,9 +182,10 @@ const App: React.FC = () => {
     });
   };
 
+  // Use type casting to fix narrowing for React.SetStateAction
   const updateStudents = (newStudents: React.SetStateAction<Student[]>) => {
     setStudents(prev => {
-      const next = typeof newStudents === 'function' ? newStudents(prev) : newStudents;
+      const next = typeof newStudents === 'function' ? (newStudents as (prevState: Student[]) => Student[])(prev) : newStudents;
       if (dbStatus === 'connected') {
         const changed = next.find((s, i) => JSON.stringify(s) !== JSON.stringify(prev[i])) || next[next.length - 1];
         if (changed) db.syncStudentSingle(changed).catch(e => console.error(e));
@@ -190,9 +194,10 @@ const App: React.FC = () => {
     });
   };
 
+  // Use type casting to fix narrowing for React.SetStateAction
   const updateMessages = (newMessages: React.SetStateAction<Message[]>) => {
     setMessages(prev => {
-      const next = typeof newMessages === 'function' ? newMessages(prev) : newMessages;
+      const next = typeof newMessages === 'function' ? (newMessages as (prevState: Message[]) => Message[])(prev) : newMessages;
       if (dbStatus === 'connected') {
         const latest = next[next.length - 1];
         if (latest && !prev.find(m => m.id === latest.id)) db.sendMessage(latest).catch(e => console.error(e));
