@@ -2,7 +2,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
 export async function generateSessionContent(title: string, subjectName: string, description: string) {
-  // Guideline: API key must be obtained exclusively from process.env.API_KEY
   const apiKey = process.env.API_KEY;
   if (!apiKey) {
     return "Erreur : Clé API non configurée. Veuillez renommer votre variable d'environnement en 'API_KEY' dans Vercel.";
@@ -32,9 +31,9 @@ export async function generateQuizForSubject(subjectName: string, content: strin
   if (!apiKey) return [];
 
   const ai = new GoogleGenAI({ apiKey });
-  const prompt = `Sur la base du contenu suivant : "${content}", génère un quiz de 4 questions pour enfants.
-  Chaque question doit avoir 4 options et un index de réponse correcte (0 à 3).
-  Retourne uniquement le JSON.`;
+  const prompt = `En te basant sur le cours suivant : "${content}", génère exactement 4 questions de quiz à choix multiples (QCM) pour des enfants.
+  Chaque question doit avoir 4 options claires et un index de réponse correcte (de 0 à 3).
+  Retourne uniquement un tableau JSON valide.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -59,7 +58,9 @@ export async function generateQuizForSubject(subjectName: string, content: strin
         }
       }
     });
-    return JSON.parse(response.text || "[]");
+    
+    const text = response.text || "[]";
+    return JSON.parse(text);
   } catch (error) {
     console.error("Gemini Quiz Error:", error);
     return [];
