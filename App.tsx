@@ -1,12 +1,12 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Student, Session, Progress, Message, ClassLevel, Instructor } from './types';
+import { Student, Session, Progress, Message, ClassLevel, Instructor, ClubType } from './types';
 import AdminDashboard from './components/Admin/AdminDashboard';
 import StudentPortal from './components/Student/StudentPortal';
 import Login from './components/Login';
 import { db, checkConnection, initSupabase } from './services/supabaseService';
 import { initialSessions, initialStudents, initialProgress, initialMessages } from './mockData';
-import { CLASSES } from './constants';
+import { CLASSES, THEMES } from './constants';
 
 const DEFAULT_ADMIN: Instructor = {
   id: 'admin-0',
@@ -32,8 +32,10 @@ const App: React.FC = () => {
     return saved ? JSON.parse(saved) : [DEFAULT_ADMIN];
   });
 
-  // Refs pour éviter les boucles de synchronisation infinies
-  const lastUpdateRef = useRef<{ [key: string]: number }>({});
+  const [clubLogos, setClubLogos] = useState<Record<ClubType, string>>({
+    [ClubType.AVENTURIERS]: THEMES[ClubType.AVENTURIERS].logo,
+    [ClubType.EXPLORATEURS]: THEMES[ClubType.EXPLORATEURS].logo
+  });
 
   const loadCloudData = useCallback(async () => {
     setIsDataReady(false);
@@ -47,13 +49,14 @@ const App: React.FC = () => {
     }
 
     try {
-      const [s, st, cl, p, m, ins] = await Promise.all([
+      const [s, st, cl, p, m, ins, logos] = await Promise.all([
         db.fetchSessions(),
         db.fetchStudents(),
         db.fetchClasses(),
         db.fetchProgress(),
         db.fetchMessages(),
-        db.fetchInstructors()
+        db.fetchInstructors(),
+        db.fetchClubLogos()
       ]);
 
       if (s && s.length > 0) setSessions(s);
@@ -62,6 +65,7 @@ const App: React.FC = () => {
       if (p && p.length > 0) setProgress(p);
       if (m && m.length > 0) setMessages(m);
       if (ins && ins.length > 0) setInstructors(ins);
+      if (logos) setClubLogos(logos);
       
       setDbStatus('connected');
     } catch (err) {
@@ -84,17 +88,19 @@ const App: React.FC = () => {
     }
   }, [loadCloudData]);
 
-  // ABONNEMENTS REALTIME (Filtrage des échos pour éviter les crashs)
   useEffect(() => {
     if (dbStatus !== 'connected') return;
+    
+    const configSub = db.subscribe('club_config', (payload) => {
+      const { id, logo } = payload.new;
+      setClubLogos(prev => ({ ...prev, [id]: logo }));
+    });
 
     const progressSub = db.subscribe('progress', (payload) => {
       const newProg = payload.new as Progress;
       setProgress(prev => {
         const existing = prev.find(p => p.studentId === newProg.studentId && p.sessionId === newProg.sessionId);
-        // On ne met à jour que si les données ont réellement changé par rapport à ce qu'on a localement
         if (existing && JSON.stringify(existing) === JSON.stringify(newProg)) return prev;
-        
         const idx = prev.findIndex(p => p.studentId === newProg.studentId && p.sessionId === newProg.sessionId);
         if (idx >= 0) {
           const updated = [...prev];
@@ -108,10 +114,7 @@ const App: React.FC = () => {
     const messagesSub = db.subscribe('messages', (payload) => {
       if (payload.eventType === 'INSERT') {
         const newMsg = payload.new as Message;
-        setMessages(prev => {
-          if (prev.find(m => m.id === newMsg.id)) return prev;
-          return [...prev, newMsg];
-        });
+        setMessages(prev => (prev.find(m => m.id === newMsg.id) ? prev : [...prev, newMsg]));
       } else if (payload.eventType === 'UPDATE') {
         const updatedMsg = payload.new as Message;
         setMessages(prev => prev.map(m => m.id === updatedMsg.id ? updatedMsg : m));
@@ -128,23 +131,36 @@ const App: React.FC = () => {
     });
 
     return () => {
+      configSub?.unsubscribe();
       progressSub?.unsubscribe();
       messagesSub?.unsubscribe();
       studentsSub?.unsubscribe();
     };
   }, [dbStatus]);
 
+  const updateClubLogos = (action: React.SetStateAction<Record<ClubType, string>>) => {
+    setClubLogos(prev => {
+      const next = typeof action === 'function' ? action(prev) : action;
+      if (dbStatus === 'connected') {
+        Object.entries(next).forEach(([club, logo]) => {
+          if (prev[club as ClubType] !== logo) {
+            db.updateClubLogo(club as ClubType, logo).catch(e => console.error(e));
+          }
+        });
+      }
+      return next;
+    });
+  };
+
   useEffect(() => {
     localStorage.setItem('mja_instructors', JSON.stringify(instructors));
     if (dbStatus === 'connected') db.syncInstructors(instructors);
   }, [instructors, dbStatus]);
 
-  // FONCTIONS DE MISE À JOUR ATOMIQUES (Optimisation Performance)
   const updateSessions = (newSessions: React.SetStateAction<Session[]>) => {
     setSessions(prev => {
       const next = typeof newSessions === 'function' ? newSessions(prev) : newSessions;
       if (dbStatus === 'connected') {
-        // Détecter quelle session a été modifiée précisément
         const changed = next.find((s, i) => JSON.stringify(s) !== JSON.stringify(prev[i])) || next[next.length - 1];
         if (changed) db.syncSessionSingle(changed).catch(e => console.error(e));
       }
@@ -157,9 +173,7 @@ const App: React.FC = () => {
       const next = typeof newProgress === 'function' ? newProgress(prev) : newProgress;
       if (dbStatus === 'connected') {
         const changed = next.find((p, i) => JSON.stringify(p) !== JSON.stringify(prev[i])) || next[next.length - 1];
-        if (changed) {
-           db.syncProgressSingle(changed).catch(e => console.error("Sync Progress Error:", e));
-        }
+        if (changed) db.syncProgressSingle(changed).catch(e => console.error(e));
       }
       return next;
     });
@@ -181,11 +195,8 @@ const App: React.FC = () => {
       const next = typeof newMessages === 'function' ? newMessages(prev) : newMessages;
       if (dbStatus === 'connected') {
         const latest = next[next.length - 1];
-        if (latest && !prev.find(m => m.id === latest.id)) {
-          db.sendMessage(latest).catch(e => console.error(e));
-        } else if (latest) {
-          db.markMessageAsRead(latest.id).catch(e => console.error(e));
-        }
+        if (latest && !prev.find(m => m.id === latest.id)) db.sendMessage(latest).catch(e => console.error(e));
+        else if (latest) db.markMessageAsRead(latest.id).catch(e => console.error(e));
       }
       return next;
     });
@@ -204,13 +215,13 @@ const App: React.FC = () => {
 
   if (loading && !isDataReady) {
     return (
-      <div className="min-h-screen bg-[#004225] flex items-center justify-center font-sans">
-        <div className="text-center space-y-6">
+      <div className="min-h-screen bg-[#004225] flex items-center justify-center font-sans text-center">
+        <div className="space-y-6">
           <div className="relative w-20 h-20 mx-auto">
              <div className="absolute inset-0 border-4 border-white/10 rounded-full"></div>
              <div className="absolute inset-0 border-4 border-t-yellow-400 rounded-full animate-spin"></div>
           </div>
-          <div><p className="text-white text-[10px] font-black uppercase tracking-[0.4em] animate-pulse">Connexion Cloud MJA</p></div>
+          <p className="text-white text-[10px] font-black uppercase tracking-[0.4em] animate-pulse">Connexion Cloud MJA</p>
         </div>
       </div>
     );
@@ -229,6 +240,7 @@ const App: React.FC = () => {
           progress={progress} setProgress={updateProgress}
           messages={messages} setMessages={updateMessages}
           instructors={instructors} setInstructors={setInstructors}
+          clubLogos={clubLogos} setClubLogos={updateClubLogos}
           dbStatus={dbStatus}
         />
       ) : (
@@ -237,6 +249,7 @@ const App: React.FC = () => {
           sessions={sessions} students={students} onUpdateStudent={updateStudents}
           classes={classes} progress={progress} setProgress={updateProgress}
           messages={messages} setMessages={updateMessages}
+          clubLogos={clubLogos}
           dbStatus={dbStatus}
         />
       )}
