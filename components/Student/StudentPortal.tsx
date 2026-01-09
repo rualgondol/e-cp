@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { Session, Student, Progress, Message, ClassLevel } from '../../types';
+import { Session, Student, Progress, Message, ClassLevel, ClubType } from '../../types';
 import { THEMES } from '../../constants';
 import CourseCard from './CourseCard';
 import SessionViewer from './SessionViewer';
@@ -18,6 +18,7 @@ interface StudentPortalProps {
   setProgress: (newProgress: React.SetStateAction<Progress[]>) => void;
   messages: Message[];
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
+  clubLogos: Record<ClubType, string>;
   dbStatus: 'loading' | 'connected' | 'error';
 }
 
@@ -32,7 +33,7 @@ const CloudIndicator = ({ status }: { status: 'loading' | 'connected' | 'error' 
 };
 
 const StudentPortal: React.FC<StudentPortalProps> = ({ 
-  studentId, onLogout, sessions, students, onUpdateStudent, classes, progress, setProgress, messages, setMessages, dbStatus
+  studentId, onLogout, sessions, students, onUpdateStudent, classes, progress, setProgress, messages, setMessages, clubLogos, dbStatus
 }) => {
   const [view, setView] = useState<'courses' | 'progress' | 'messages' | 'change-pwd'>('courses');
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -40,8 +41,6 @@ const StudentPortal: React.FC<StudentPortalProps> = ({
 
   const student = students.find(s => s.id === studentId);
   const studentClass = classes.find(c => c.id === student?.classId);
-
-  // Vérification mot de passe temporaire : forcer le changement si pas encore fait
   const isPwdChangeRequired = student && !student.passwordChanged;
 
   const mySessions = useMemo(() => sessions.filter(s => s.classId === studentClass?.id).sort((a,b) => a.number - b.number), [sessions, studentClass]);
@@ -55,10 +54,8 @@ const StudentPortal: React.FC<StudentPortalProps> = ({
   const getSessionStatus = (session: Session) => {
     const isPast = new Date(session.availabilityDate) <= new Date();
     if (!isPast) return 'locked-future';
-
     const index = mySessions.findIndex(s => s.id === session.id);
     if (index === 0) return 'available';
-
     const prevSession = mySessions[index - 1];
     const prevProg = myProgress.find(p => p.sessionId === prevSession.id);
     return prevProg?.completed ? 'available' : 'locked-linear';
@@ -77,7 +74,9 @@ const StudentPortal: React.FC<StudentPortalProps> = ({
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4 font-sans">
          <div className="bg-white p-8 md:p-12 rounded-[2rem] md:rounded-[3.5rem] shadow-2xl max-w-md w-full text-center space-y-8 animate-scale-in">
-            <div className="text-5xl md:text-6xl">🛡️</div>
+            <div className="text-5xl md:text-6xl flex justify-center">
+              <img src={clubLogos[studentClass.club]} className="w-24 h-24 object-contain" alt="Club Logo" />
+            </div>
             <h2 className="text-xl md:text-2xl font-black text-gray-900 uppercase">Sécurité Obligatoire</h2>
             <p className="text-xs md:text-sm text-gray-400 font-medium leading-relaxed">Veuillez définir un mot de passe personnel pour protéger vos progrès.</p>
             <div className="space-y-4">
@@ -95,10 +94,8 @@ const StudentPortal: React.FC<StudentPortalProps> = ({
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-start">
             <div className="flex items-center gap-3">
-              <span className="text-xl bg-white/10 w-9 h-9 flex items-center justify-center rounded-xl shadow-inner overflow-hidden">
-                  {studentClass.icon && studentClass.icon.length > 5 ? (
-                      <img src={studentClass.icon} className="w-full h-full object-cover" alt="" />
-                  ) : studentClass.icon || '⛺'}
+              <span className="text-xl bg-white w-9 h-9 flex items-center justify-center rounded-xl shadow-inner overflow-hidden p-1">
+                  <img src={clubLogos[studentClass.club]} className="w-full h-full object-contain" alt="" />
               </span>
               <div>
                 <h1 className="text-base font-black leading-none truncate max-w-[150px]">{student.fullName}</h1>
