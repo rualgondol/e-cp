@@ -67,14 +67,30 @@ const GlobalTracking: React.FC<GlobalTrackingProps> = ({ club, sessions, student
 
   return (
     <div className="space-y-6">
-      <div className="bg-white p-4 md:p-8 rounded-2xl md:rounded-[2.5rem] shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <div className="bg-white p-6 md:p-8 rounded-[2rem] md:rounded-[2.5rem] shadow-sm flex flex-col gap-6">
         <div>
-          <h3 className="text-xl md:text-2xl font-black text-gray-900 uppercase tracking-tighter">Carte de Progression</h3>
-          <p className="text-[10px] md:text-xs text-gray-400 font-bold">Cliquer sur le nom d'un jeune pour discuter.</p>
+          <h3 className="text-xl md:text-2xl font-black text-gray-900 uppercase tracking-tighter leading-none mb-2">Carte de Progression</h3>
+          <p className="text-[10px] md:text-xs text-gray-400 font-bold uppercase tracking-widest">Suivi détaillé des pré-requis par classe</p>
         </div>
-        <select value={selectedClassId} onChange={(e) => setSelectedClassId(e.target.value)} className="w-full md:w-auto bg-gray-50 border-2 border-gray-100 rounded-xl md:rounded-2xl px-4 py-2.5 font-black text-[10px] uppercase outline-none">
-          {filteredClasses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
+        
+        <div className="flex flex-wrap gap-2 pt-2 border-t">
+          {filteredClasses.map(c => (
+            <button 
+              key={c.id} 
+              onClick={() => setSelectedClassId(c.id)} 
+              className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all border flex items-center gap-3 ${selectedClassId === c.id ? 'bg-blue-600 border-blue-600 text-white shadow-md' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-100'}`}
+            >
+              <span className="w-5 h-5 flex items-center justify-center overflow-hidden rounded bg-white/10">
+                 {c.icon && c.icon.length > 5 ? (
+                   <img src={c.icon} className="w-full h-full object-contain" alt="" />
+                 ) : (
+                   <span className="text-[10px]">{c.icon || '⛺'}</span>
+                 )}
+              </span>
+              {c.name}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="bg-white rounded-2xl md:rounded-[3rem] shadow-xl overflow-hidden border border-gray-100">

@@ -134,8 +134,19 @@ const StudentManager: React.FC<StudentManagerProps> = ({ club, students, setStud
           <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2 block">Classe</label>
           <div className="flex flex-wrap gap-2">
             {filteredClasses.map(cls => (
-              <button key={cls.id} onClick={() => { setSelectedClassId(cls.id); setSelectedStudentId(null); }} className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all border flex items-center gap-2 ${selectedClassId === cls.id ? 'bg-blue-600 border-blue-600 text-white shadow-md' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-100'}`}>
-                {cls.icon && cls.icon.length < 5 ? cls.icon : '⛺'} {cls.name}
+              <button 
+                key={cls.id} 
+                onClick={() => { setSelectedClassId(cls.id); setSelectedStudentId(null); }} 
+                className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all border flex items-center gap-2 ${selectedClassId === cls.id ? 'bg-blue-600 border-blue-600 text-white shadow-md' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-100'}`}
+              >
+                <span className="w-5 h-5 flex items-center justify-center overflow-hidden rounded bg-white/10">
+                   {cls.icon && cls.icon.length > 5 ? (
+                     <img src={cls.icon} className="w-full h-full object-contain" alt="" />
+                   ) : (
+                     <span>{cls.icon || '⛺'}</span>
+                   )}
+                </span>
+                {cls.name}
               </button>
             ))}
           </div>
