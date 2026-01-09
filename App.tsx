@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Student, Session, Progress, Message, ClassLevel, Instructor } from './types';
 import AdminDashboard from './components/Admin/AdminDashboard';
 import StudentPortal from './components/Student/StudentPortal';
@@ -31,6 +31,9 @@ const App: React.FC = () => {
     const saved = localStorage.getItem('mja_instructors');
     return saved ? JSON.parse(saved) : [DEFAULT_ADMIN];
   });
+
+  // Refs pour éviter les boucles de synchronisation infinies
+  const lastUpdateRef = useRef<{ [key: string]: number }>({});
 
   const loadCloudData = useCallback(async () => {
     setIsDataReady(false);
@@ -81,13 +84,17 @@ const App: React.FC = () => {
     }
   }, [loadCloudData]);
 
-  // ABONNEMENTS REALTIME (Écoute en direct des changements dans la base)
+  // ABONNEMENTS REALTIME (Filtrage des échos pour éviter les crashs)
   useEffect(() => {
     if (dbStatus !== 'connected') return;
 
     const progressSub = db.subscribe('progress', (payload) => {
       const newProg = payload.new as Progress;
       setProgress(prev => {
+        const existing = prev.find(p => p.studentId === newProg.studentId && p.sessionId === newProg.sessionId);
+        // On ne met à jour que si les données ont réellement changé par rapport à ce qu'on a localement
+        if (existing && JSON.stringify(existing) === JSON.stringify(newProg)) return prev;
+        
         const idx = prev.findIndex(p => p.studentId === newProg.studentId && p.sessionId === newProg.sessionId);
         if (idx >= 0) {
           const updated = [...prev];
@@ -113,7 +120,11 @@ const App: React.FC = () => {
 
     const studentsSub = db.subscribe('students', (payload) => {
       const updatedStudent = payload.new as Student;
-      setStudents(prev => prev.map(s => s.id === updatedStudent.id ? updatedStudent : s));
+      setStudents(prev => {
+        const existing = prev.find(s => s.id === updatedStudent.id);
+        if (existing && JSON.stringify(existing) === JSON.stringify(updatedStudent)) return prev;
+        return prev.map(s => s.id === updatedStudent.id ? updatedStudent : s);
+      });
     });
 
     return () => {
@@ -128,10 +139,15 @@ const App: React.FC = () => {
     if (dbStatus === 'connected') db.syncInstructors(instructors);
   }, [instructors, dbStatus]);
 
+  // FONCTIONS DE MISE À JOUR ATOMIQUES (Optimisation Performance)
   const updateSessions = (newSessions: React.SetStateAction<Session[]>) => {
     setSessions(prev => {
       const next = typeof newSessions === 'function' ? newSessions(prev) : newSessions;
-      if (dbStatus === 'connected') db.syncSessions(next).catch(e => console.error(e));
+      if (dbStatus === 'connected') {
+        // Détecter quelle session a été modifiée précisément
+        const changed = next.find((s, i) => JSON.stringify(s) !== JSON.stringify(prev[i])) || next[next.length - 1];
+        if (changed) db.syncSessionSingle(changed).catch(e => console.error(e));
+      }
       return next;
     });
   };
@@ -140,7 +156,6 @@ const App: React.FC = () => {
     setProgress(prev => {
       const next = typeof newProgress === 'function' ? newProgress(prev) : newProgress;
       if (dbStatus === 'connected') {
-        // Au lieu de deviner le dernier, on cherche celui qui diffère de `prev`
         const changed = next.find((p, i) => JSON.stringify(p) !== JSON.stringify(prev[i])) || next[next.length - 1];
         if (changed) {
            db.syncProgressSingle(changed).catch(e => console.error("Sync Progress Error:", e));
@@ -153,7 +168,10 @@ const App: React.FC = () => {
   const updateStudents = (newStudents: React.SetStateAction<Student[]>) => {
     setStudents(prev => {
       const next = typeof newStudents === 'function' ? newStudents(prev) : newStudents;
-      if (dbStatus === 'connected') db.syncStudents(next).catch(e => console.error(e));
+      if (dbStatus === 'connected') {
+        const changed = next.find((s, i) => JSON.stringify(s) !== JSON.stringify(prev[i])) || next[next.length - 1];
+        if (changed) db.syncStudentSingle(changed).catch(e => console.error(e));
+      }
       return next;
     });
   };
