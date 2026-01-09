@@ -25,6 +25,8 @@ interface AdminDashboardProps {
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   instructors: Instructor[];
   setInstructors: React.Dispatch<React.SetStateAction<Instructor[]>>;
+  clubLogos: Record<ClubType, string>;
+  setClubLogos: React.Dispatch<React.SetStateAction<Record<ClubType, string>>>;
   dbStatus: 'loading' | 'connected' | 'error';
 }
 
@@ -39,7 +41,7 @@ const CloudIndicator = ({ status }: { status: 'loading' | 'connected' | 'error' 
 };
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
-  onLogout, currentUserRole, sessions, setSessions, students, setStudents, classes, setClasses, progress, setProgress, messages, setMessages, instructors, setInstructors, dbStatus
+  onLogout, currentUserRole, sessions, setSessions, students, setStudents, classes, setClasses, progress, setProgress, messages, setMessages, instructors, setInstructors, clubLogos, setClubLogos, dbStatus
 }) => {
   const [activeClub, setActiveClub] = useState<ClubType>(() => {
     if (currentUserRole === 'EXPLORATEURS') return ClubType.EXPLORATEURS;
@@ -81,7 +83,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden font-sans">
-      {/* Overlay for mobile sidebar */}
       {isSidebarOpen && (
         <div 
           className="fixed inset-0 bg-black/50 z-40 lg:hidden backdrop-blur-sm"
@@ -104,7 +105,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
         {isAdmin && (
           <div className="px-6 py-4">
-            <p className="text-[9px] font-black uppercase tracking-widest opacity-40 mb-3 ml-1">CLUB</p>
+            <p className="text-[9px] font-black uppercase tracking-widest opacity-40 mb-3 ml-1">SELECTIONNER LE CLUB</p>
             <div className="relative bg-black/20 p-1 rounded-2xl flex items-center h-12 overflow-hidden">
               <div 
                 className={`absolute h-10 w-[calc(50%-4px)] bg-white/10 rounded-xl transition-all duration-300 ease-out z-0 ${activeClub === ClubType.EXPLORATEURS ? 'translate-x-full' : 'translate-x-0'}`}
@@ -114,14 +115,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 onClick={() => setActiveClub(ClubType.AVENTURIERS)}
                 className={`relative z-10 flex-1 flex items-center justify-center gap-2 text-[10px] font-black uppercase transition-colors duration-300 ${activeClub === ClubType.AVENTURIERS ? 'text-white' : 'text-white/40 hover:text-white/60'}`}
               >
-                <span>⛵</span>
+                <img src={clubLogos[ClubType.AVENTURIERS]} className="w-5 h-5 object-contain" alt="" />
                 <span>AVENT.</span>
               </button>
               <button 
                 onClick={() => setActiveClub(ClubType.EXPLORATEURS)}
                 className={`relative z-10 flex-1 flex items-center justify-center gap-2 text-[10px] font-black uppercase transition-colors duration-300 ${activeClub === ClubType.EXPLORATEURS ? 'text-white' : 'text-white/40 hover:text-white/60'}`}
               >
-                <span>⛺</span>
+                <img src={clubLogos[ClubType.EXPLORATEURS]} className="w-5 h-5 object-contain" alt="" />
                 <span>EXPLOR.</span>
               </button>
             </div>
@@ -170,7 +171,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       </aside>
 
       <main className="flex-1 overflow-y-auto relative bg-[#F9FBFF] flex flex-col">
-        {/* Mobile Header Toggle */}
         <header className="lg:hidden p-4 bg-white border-b flex justify-between items-center sticky top-0 z-30">
           <button onClick={() => setIsSidebarOpen(true)} className="p-2 bg-gray-100 rounded-lg text-xl">☰</button>
           <div className="text-right">
@@ -190,6 +190,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <Documentation 
                 club={activeClub} students={students} classes={classes} sessions={sessions} progress={progress} instructors={instructors} dbStatus={dbStatus} 
                 onManualSync={() => window.location.reload()}
+                clubLogos={clubLogos} setClubLogos={setClubLogos}
               />
             )}
             {activeTab === 'users' && isAdmin && <InstructorManager instructors={instructors} setInstructors={setInstructors} />}
