@@ -28,6 +28,9 @@ CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY, club TEXT NOT NULL, "c
 CREATE TABLE IF NOT EXISTS progress (id BIGSERIAL PRIMARY KEY, "studentId" TEXT REFERENCES students(id) ON DELETE CASCADE, "sessionId" TEXT REFERENCES sessions(id) ON DELETE CASCADE, score INTEGER, completed BOOLEAN DEFAULT false, "completedSubjects" TEXT[] DEFAULT '{}', "completionDate" TIMESTAMP WITH TIME ZONE DEFAULT NOW(), UNIQUE("studentId", "sessionId"));
 CREATE TABLE IF NOT EXISTS messages (id TEXT PRIMARY KEY, "senderId" TEXT NOT NULL, "receiverId" TEXT NOT NULL, content TEXT NOT NULL, timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(), "isRead" BOOLEAN DEFAULT false);
 CREATE TABLE IF NOT EXISTS club_config (id TEXT PRIMARY KEY, logo TEXT, updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW());
+
+-- MISE À JOUR ICONES LONGUES
+ALTER TABLE classes ALTER COLUMN icon TYPE TEXT;
 `;
 
   const handleLogoUpload = (targetClub: ClubType, e: React.ChangeEvent<HTMLInputElement>) => {

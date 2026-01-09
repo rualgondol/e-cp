@@ -24,6 +24,7 @@ const ClassManager: React.FC<ClassManagerProps> = ({ club, classes, setClasses }
         await db.updateAllClassIcons(club, editingClass.icon);
         // Mise à jour locale de l'état
         setClasses(prev => prev.map(c => c.club === club ? { ...c, icon: editingClass.icon } : c));
+        alert(`Icône synchronisée pour toutes les classes du club ${club} !`);
       } else {
         // Mise à jour SQL d'une seule classe
         await db.updateClassSingle(editingClass);
@@ -57,7 +58,7 @@ const ClassManager: React.FC<ClassManagerProps> = ({ club, classes, setClasses }
           <div key={cls.id} className="border p-6 rounded-2xl flex items-center gap-6 hover:shadow-md transition bg-gray-50/50">
             <div className="w-20 h-20 bg-white rounded-2xl border-2 border-dashed border-gray-200 flex items-center justify-center overflow-hidden flex-shrink-0">
               {cls.icon && cls.icon.length > 5 ? (
-                <img src={cls.icon} className="w-full h-full object-cover" alt={cls.name}/>
+                <img src={cls.icon} className="w-full h-full object-contain p-2" alt={cls.name}/>
               ) : (
                 <span className="text-4xl">{cls.icon || '❓'}</span>
               )}
@@ -102,7 +103,7 @@ const ClassManager: React.FC<ClassManagerProps> = ({ club, classes, setClasses }
                     />
                 </div>
                 <div>
-                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Ou Image (File)</label>
+                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Ou Image (Logo)</label>
                     <div className="relative h-full">
                         <input type="file" accept="image/*" onChange={handleIconUpload} className="absolute inset-0 opacity-0 cursor-pointer z-10" />
                         <div className="border-2 border-dashed border-gray-200 rounded-xl p-3 h-full flex items-center justify-center text-xs font-bold text-gray-400">
