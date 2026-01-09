@@ -84,7 +84,11 @@ const StudentPortal: React.FC<StudentPortalProps> = ({
       <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4 font-sans">
          <div className="bg-white p-8 md:p-12 rounded-[2rem] md:rounded-[3.5rem] shadow-2xl max-w-md w-full text-center space-y-8 animate-scale-in">
             <div className="text-5xl md:text-6xl flex justify-center">
-              <img src={clubLogos[studentClass.club]} className="w-24 h-24 object-contain" alt="Club Logo" />
+              {studentClass.icon && studentClass.icon.length > 5 ? (
+                <img src={studentClass.icon} className="w-24 h-24 object-contain" alt="Class Logo" />
+              ) : (
+                <span className="text-6xl">{studentClass.icon || '⛺'}</span>
+              )}
             </div>
             <h2 className="text-xl md:text-2xl font-black text-gray-900 uppercase">Sécurité Obligatoire</h2>
             <p className="text-xs md:text-sm text-gray-400 font-medium leading-relaxed">Veuillez définir un mot de passe personnel pour protéger vos progrès.</p>
@@ -104,7 +108,11 @@ const StudentPortal: React.FC<StudentPortalProps> = ({
           <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-start">
             <div className="flex items-center gap-3">
               <span className="text-xl bg-white w-9 h-9 flex items-center justify-center rounded-xl shadow-inner overflow-hidden p-1">
-                  <img src={clubLogos[studentClass.club]} className="w-full h-full object-contain" alt="" />
+                  {studentClass.icon && studentClass.icon.length > 5 ? (
+                    <img src={studentClass.icon} className="w-full h-full object-contain" alt="" />
+                  ) : (
+                    <span className="text-lg">{studentClass.icon || '⛺'}</span>
+                  )}
               </span>
               <div>
                 <h1 className="text-base font-black leading-none truncate max-w-[150px]">{student.fullName}</h1>
@@ -131,7 +139,7 @@ const StudentPortal: React.FC<StudentPortalProps> = ({
         </div>
       </header>
 
-      {/* Statut d'acquisition de classe - Affichage spécial */}
+      {/* Bannière de Statut d'acquisition de classe */}
       {!activeSessionId && view === 'courses' && (
         <div className="max-w-6xl mx-auto w-full px-4 pt-6 md:px-8">
            <div className={`p-6 rounded-[2.5rem] flex flex-col md:flex-row items-center gap-6 border-2 transition-all duration-700 shadow-xl overflow-hidden relative ${isClassAcquired ? 'bg-yellow-50 border-yellow-200' : 'bg-white border-gray-100'}`}>
@@ -145,13 +153,19 @@ const StudentPortal: React.FC<StudentPortalProps> = ({
               </div>
               <div className="text-center md:text-left">
                  <h2 className="text-2xl font-black text-gray-900 uppercase tracking-tighter">{studentClass.name}</h2>
-                 <p className={`text-[10px] font-black uppercase tracking-[0.2em] mt-1 ${isClassAcquired ? 'text-yellow-600' : 'text-blue-500'}`}>
-                    {isClassAcquired ? '🏆 Statut : CLASSE ACQUISE' : '📖 Statut : EN COURS D\'ACQUISITION'}
-                 </p>
+                 <div className="flex flex-col md:flex-row md:items-center gap-2 mt-1">
+                   <p className={`text-[10px] font-black uppercase tracking-[0.2em] ${isClassAcquired ? 'text-yellow-600' : 'text-blue-500'}`}>
+                      {isClassAcquired ? '🏆 Statut : CLASSE ACQUISE' : '📖 Statut : EN COURS D\'ACQUISITION'}
+                   </p>
+                   <span className="hidden md:inline opacity-20">|</span>
+                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                      {isClassAcquired ? 'Session de certification complétée' : `Progression : ${myProgress.filter(p => p.completed).length} / ${mySessions.length} semaines`}
+                   </p>
+                 </div>
               </div>
               <div className="flex-1 flex justify-center md:justify-end">
                   <div className={`px-8 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg ${isClassAcquired ? 'bg-yellow-500 text-white animate-bounce' : 'bg-gray-100 text-gray-400'}`}>
-                    {isClassAcquired ? 'Félicitations !' : `${myProgress.filter(p => p.completed).length} / ${mySessions.length} Validées`}
+                    {isClassAcquired ? 'Félicitations !' : 'En apprentissage'}
                   </div>
               </div>
            </div>
