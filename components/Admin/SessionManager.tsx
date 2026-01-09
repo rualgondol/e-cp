@@ -145,9 +145,16 @@ const SessionManager: React.FC<SessionManagerProps> = ({ club, sessions, setSess
             <h3 className="text-base font-black text-gray-900 tracking-tight uppercase mb-3 pb-2 border-b">Semaine {session.number}</h3>
             <div className="space-y-2">
               {session.subjects.map((sub, i) => (
-                <div key={i} className="bg-gray-50 p-2 rounded-xl border border-gray-100 flex justify-between items-center">
-                  <span className="text-[10px] font-black text-gray-800 leading-tight">{sub.name}</span>
-                  {sub.quiz && sub.quiz.length > 0 && <span className="text-[8px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-black">{sub.quiz.length} QCM</span>}
+                <div key={i} className="bg-gray-50 p-3 rounded-xl border border-gray-100 flex justify-between items-center">
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-[10px] font-black text-gray-800 leading-tight truncate">{sub.name}</span>
+                    <span className="text-[8px] text-gray-400 font-bold italic line-clamp-1">{sub.prerequisite}</span>
+                  </div>
+                  {sub.quiz && sub.quiz.length > 0 && (
+                    <span className="text-[8px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-black flex-shrink-0 ml-2">
+                      {sub.quiz.length} QCM
+                    </span>
+                  )}
                 </div>
               ))}
             </div>
@@ -198,7 +205,7 @@ const SessionManager: React.FC<SessionManagerProps> = ({ club, sessions, setSess
                           const subjects = [...editingSession.subjects!];
                           subjects[idx].name = e.target.value;
                           setEditingSession({...editingSession, subjects});
-                        }} className="w-full bg-gray-50 text-xs font-black p-3 rounded-2xl border outline-none focus:border-blue-300" />
+                        }} className="w-full bg-gray-50 text-xs font-black p-3 rounded-2xl border outline-none focus:border-blue-400 shadow-sm" />
                       </div>
                       <div className="space-y-1">
                         <label className="text-[8px] font-black text-gray-400 uppercase ml-2 tracking-widest">Objectif pédagogique</label>
@@ -206,7 +213,7 @@ const SessionManager: React.FC<SessionManagerProps> = ({ club, sessions, setSess
                           const subjects = [...editingSession.subjects!];
                           subjects[idx].prerequisite = e.target.value;
                           setEditingSession({...editingSession, subjects});
-                        }} className="w-full bg-gray-50 font-bold p-3 rounded-2xl border text-xs outline-none focus:border-blue-300" />
+                        }} className="w-full bg-gray-50 font-bold p-3 rounded-2xl border text-xs outline-none focus:border-blue-400 shadow-sm" />
                       </div>
                     </div>
                     
