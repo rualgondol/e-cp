@@ -1,6 +1,6 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { Session, Student, ClassLevel, Progress, Message, Instructor } from '../types';
+import { Session, Student, ClassLevel, Progress, Message, Instructor, ClubType } from '../types';
 
 const getEnvVar = (name: string): string => {
   const localName = name.replace('VITE_', 'MJA_').replace('NEXT_PUBLIC_', 'MJA_');
@@ -149,5 +149,21 @@ export const db = {
     const client = initSupabase();
     if (!client) return;
     await client.from('instructors').upsert(instructors);
+  },
+
+  async fetchClubLogos(): Promise<Record<ClubType, string> | null> {
+    const client = initSupabase();
+    if (!client) return null;
+    const { data } = await client.from('club_config').select('*');
+    if (!data) return null;
+    const logos: any = {};
+    data.forEach(item => { logos[item.id] = item.logo; });
+    return logos as Record<ClubType, string>;
+  },
+
+  async updateClubLogo(club: ClubType, logo: string) {
+    const client = initSupabase();
+    if (!client) return;
+    await client.from('club_config').upsert({ id: club, logo, updated_at: new Date().toISOString() });
   }
 };
