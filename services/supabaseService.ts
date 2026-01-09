@@ -70,6 +70,19 @@ export const db = {
     return data || [];
   },
 
+  async updateClassSingle(cls: ClassLevel) {
+    const client = initSupabase();
+    if (!client) return;
+    await client.from('classes').upsert(cls);
+  },
+
+  async updateAllClassIcons(club: ClubType, icon: string) {
+    const client = initSupabase();
+    if (!client) return;
+    const { error } = await client.from('classes').update({ icon }).eq('club', club);
+    if (error) console.error("Bulk Icon Update Error:", error.message);
+  },
+
   async fetchStudents(): Promise<Student[]> {
     const client = initSupabase();
     if (!client) return [];
