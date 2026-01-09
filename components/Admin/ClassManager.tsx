@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { ClubType, ClassLevel } from '../../types';
+import { db } from '../../services/supabaseService';
 
 interface ClassManagerProps {
   club: ClubType;
@@ -10,11 +11,32 @@ interface ClassManagerProps {
 
 const ClassManager: React.FC<ClassManagerProps> = ({ club, classes, setClasses }) => {
   const [editingClass, setEditingClass] = useState<ClassLevel | null>(null);
+  const [syncToAll, setSyncToAll] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!editingClass) return;
-    setClasses(prev => prev.map(c => c.id === editingClass.id ? editingClass : c));
-    setEditingClass(null);
+    setIsSyncing(true);
+
+    try {
+      if (syncToAll && editingClass.icon) {
+        // Mise à jour SQL de toutes les classes du club
+        await db.updateAllClassIcons(club, editingClass.icon);
+        // Mise à jour locale de l'état
+        setClasses(prev => prev.map(c => c.club === club ? { ...c, icon: editingClass.icon } : c));
+      } else {
+        // Mise à jour SQL d'une seule classe
+        await db.updateClassSingle(editingClass);
+        // Mise à jour locale
+        setClasses(prev => prev.map(c => c.id === editingClass.id ? editingClass : c));
+      }
+    } catch (e) {
+      alert("Erreur de synchronisation SQL");
+    } finally {
+      setIsSyncing(false);
+      setEditingClass(null);
+      setSyncToAll(false);
+    }
   };
 
   const handleIconUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -44,7 +66,7 @@ const ClassManager: React.FC<ClassManagerProps> = ({ club, classes, setClasses }
               <h3 className="font-black text-lg text-gray-900">{cls.name}</h3>
               <p className="text-sm font-bold text-gray-500 uppercase">{cls.age} ans</p>
               <button 
-                onClick={() => setEditingClass(cls)}
+                onClick={() => { setSyncToAll(false); setEditingClass(cls); }}
                 className="mt-2 text-blue-600 text-[10px] font-black hover:underline uppercase tracking-widest"
               >
                 MODIFIER INFOS
@@ -89,14 +111,30 @@ const ClassManager: React.FC<ClassManagerProps> = ({ club, classes, setClasses }
                     </div>
                 </div>
               </div>
+
+              {/* Option de synchronisation globale */}
+              <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100 flex items-center gap-3">
+                 <input 
+                  type="checkbox" 
+                  id="syncAll" 
+                  checked={syncToAll} 
+                  onChange={e => setSyncToAll(e.target.checked)} 
+                  className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
+                 />
+                 <label htmlFor="syncAll" className="text-[10px] font-black text-blue-900 uppercase leading-tight cursor-pointer">
+                    Appliquer ce logo à TOUTES les classes du club {club}
+                 </label>
+              </div>
             </div>
+            
             <div className="flex justify-end gap-3 pt-4 border-t">
               <button onClick={() => setEditingClass(null)} className="px-6 py-2 text-gray-400 font-bold uppercase text-xs">Annuler</button>
               <button 
                 onClick={handleSave}
-                className="bg-blue-600 text-white px-8 py-3 rounded-2xl font-black text-xs uppercase shadow-xl hover:bg-blue-700 transition"
+                disabled={isSyncing}
+                className={`bg-blue-600 text-white px-8 py-3 rounded-2xl font-black text-xs uppercase shadow-xl hover:bg-blue-700 transition flex items-center gap-2 ${isSyncing ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
-                Mettre à jour
+                {isSyncing ? 'Synchronisation...' : 'Enregistrer SQL'}
               </button>
             </div>
           </div>
