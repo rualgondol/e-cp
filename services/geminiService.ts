@@ -1,41 +1,40 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 
-export async function generateSessionContent(title: string, subjectName: string, description: string) {
+// Initialisation de l'IA avec la clé API provenant exclusivement de process.env.API_KEY
+const getAIClient = () => {
   const apiKey = process.env.API_KEY;
   if (!apiKey) {
-    return "Erreur : Clé API non configurée. Veuillez renommer votre variable d'environnement en 'API_KEY' dans Vercel.";
+    throw new Error("La clé API Gemini est manquante. Vérifiez votre configuration.");
   }
+  return new GoogleGenAI({ apiKey });
+};
 
-  const ai = new GoogleGenAI({ apiKey });
-  const prompt = `Génère un cours structuré pour un enfant de club de jeunesse adventiste (Aventurier/Explorateur). 
-  Thème : ${subjectName}. 
-  Objectif : ${description}. 
-  Format : HTML propre avec h2, p, et listes ul/li. 
-  Ton : Pédagogique, encourageant et spirituel.`;
-
+export async function generateSessionContent(title: string, subjectName: string, description: string) {
   try {
+    const ai = getAIClient();
+    const prompt = `Génère un cours structuré pour un enfant de club de jeunesse adventiste. 
+    Thème : ${subjectName}. Objectif : ${description}. 
+    Format : HTML propre avec h2, p, ul/li. Ton : Pédagogique et spirituel.`;
+
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: prompt,
     });
     return response.text || "Erreur de génération.";
   } catch (error) {
-    console.error("Gemini Error:", error);
-    return "Erreur Gemini : " + (error instanceof Error ? error.message : "Inconnue");
+    console.error("Gemini Content Error:", error);
+    return "Erreur lors de la génération du contenu.";
   }
 }
 
 export async function generateQuizForSubject(subjectName: string, content: string) {
-  const apiKey = process.env.API_KEY;
-  if (!apiKey) return [];
-
-  const ai = new GoogleGenAI({ apiKey });
-  const prompt = `En te basant sur le cours suivant : "${content}", génère exactement 4 questions de quiz à choix multiples (QCM) pour des enfants.
-  Chaque question doit avoir 4 options claires et un index de réponse correcte (de 0 à 3).
-  Retourne uniquement un tableau JSON valide.`;
-
   try {
+    const ai = getAIClient();
+    const prompt = `En te basant sur ce cours : "${content}", génère exactement 4 questions de quiz QCM pour enfants.
+    Chaque question doit avoir 4 options et un index de réponse correcte (0-3). 
+    Retourne UNIQUEMENT un tableau JSON valide.`;
+
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: prompt,
@@ -59,7 +58,8 @@ export async function generateQuizForSubject(subjectName: string, content: strin
       }
     });
     
-    const text = response.text || "[]";
+    const text = response.text;
+    if (!text) return [];
     return JSON.parse(text);
   } catch (error) {
     console.error("Gemini Quiz Error:", error);
